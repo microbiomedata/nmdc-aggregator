@@ -15,3 +15,13 @@ The container image is currently hosted at: https://hub.docker.com/r/microbiomed
 - `POLL_TIME`: Number of seconds to sleep between each run (Default: `14400`, which is 4 hours)
 - `NMDC_BASE_URL`: Base URL to access the data (Default: `https://data.microbiomedata.org/data`)
 - `NMDC_BASE_PATH`: Base path to the data on disk (Default: `/global/cfs/cdirs/m3408/results`)
+
+## Release Notes
+
+### 1.0.1
+
+Fix a bug in the metaP script
+
+### 1.0.0
+
+Initial release

@@ -4,6 +4,13 @@ from pymongo import MongoClient
 
 
 class AnnotationLine():
+    """
+    Object representation built from a GFF annotation line
+
+    The object countains a list of annotations for KEGG,
+    COG, EC, and product.  Currently on the KEGG annotations
+    are used.
+    """
 
     def __init__(self, line, filter=None):
         self.id = None
@@ -31,6 +38,9 @@ class AnnotationLine():
 
 
 class MetaProtAgg():
+    """
+    MetaP Aggregation class
+    """
     _BASE_URL_ENV = "NMDC_BASE_URL"
     _base_url = "https://data.microbiomedata.org/data"
     _BASE_PATH_ENV = "NMDC_BASE_PATH"
@@ -80,52 +90,79 @@ class MetaProtAgg():
             # skip over bad records
             if not do or 'data_object_type' not in do:
                 continue
-            if do['data_object_type'] == 'Annotation Amino Acid FASTA':
+            if do['data_object_type'] == 'Functional Annotation GFF':
                 url = do['url']
-                url.replace("_proteins.faa", "_functional_annotation.gff")
-                break
-        return url
+                return url
+            elif do['data_object_type'] == 'Annotation Amino Acid FASTA':
+                url = do['url']
+                return url.replace("_proteins.faa", "_functional_annotation.gff")
+        return None
 
     def process_activity(self, act):
+        """
+        Function to process an activity record.
+        Input: activity record
+        Output: Dictonary of KEGG records
+
+        This currently relies on the has_peptide_quantificiations
+        records in the activity record.  This may change in the future. 
+        """
         # Get the URL and ID
         url = self.find_anno(act['has_input'])
         if not url:
-            raise ValueError("Missing url")
+            raise ValueError(f"Missing url for {act['id']}")
         url_id = url.split('/')[-1].replace("nmdc_", "nmdc:").split('_')[0]
         id_list = set()
         # Get the filter list
         for pep in act['has_peptide_quantifications']:
             # This check is because some activities have
             # bogus peptides
-            mid = pep['all_proteins'][0].split('_')[0]
-            if not mid.startswith(url_id):
-                continue
+            if len(pep['all_proteins']) > 0:
+                mid = pep['all_proteins'][0].split('_')[0]
+                if not mid.startswith(url_id):
+                    continue
             id_list.update(pep['all_proteins'])
+        # get the KEGG protein terms from the annotation file
         proteins = self.get_kegg_terms(url, id_list)
         kegg_recs = {}
         for pep in act['has_peptide_quantifications']:
+            # Loop through all proteins
             for prot in pep['all_proteins']:
+                # ignore any proteins that don't have KEGG
+                # annotations
                 if prot not in proteins:
                     continue
                 kos = proteins[prot]
+                # Loop through the KEGG annotations for the protein
                 for ko in kos:
+                    # Initialize the record
                     if ko not in kegg_recs:
                         new_rec = {"metaproteomic_analysis_id": act['id'],
                                    "gene_function_id": ko,
                                    "count": 0,
                                    "best_protein": False}
                         kegg_recs[ko] = new_rec
+                    # increment the count
                     kegg_recs[ko]["count"] += 1
+                    # If there is a best_protein then set the flag to true
                     if prot == pep['best_protein']:
                         kegg_recs[ko]["best_protein"] = True
         return kegg_recs
 
     def sweep(self):
+        """
+        This is the main action function. This goes through all
+        of the metaP activity records and finds any that are missing
+        aggregations.
+        """
         print("Getting list of indexed objects")
         done = self.agg_col.distinct("metaproteomic_analysis_id")
+
+        # Iterate through all of the metaP activities
         for actrec in self.act_col.find({}):
             # New annotations should have this
             act_id = actrec['id']
+            # Skip if already processed
             if act_id in done:
                 continue
             try:
@@ -135,7 +172,7 @@ class MetaProtAgg():
                 print(ex)
                 continue
             if len(rows) > 0:
-                print(' - %s' % (str(rows[0])))
+                print(f"Inserting: {len(rows)} rows for {act_id}")
                 self.agg_col.insert_many(rows)
             else:
                 print(f' - No rows for {act_id}')
