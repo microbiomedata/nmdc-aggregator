@@ -9,4 +9,7 @@ ADD . /src
 
 WORKDIR /src
 
+# Make the entrypoint script executable so it can be run as a program.
+RUN chmod +x ./agg.sh
+
 ENTRYPOINT ./agg.sh
