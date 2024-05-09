@@ -18,15 +18,15 @@ The container image is currently hosted at: https://github.com/microbiomedata/nm
 
 ## Release Notes
 
-### 1.0.2
+### v1.0.2
 
 - Configure GitHub Actions to build and push container images to GitHub Container Registry
 - Update `Dockerfile` so that the entrypoint shell script is executable
 
-### 1.0.1
+### v1.0.1
 
 - Fix a bug in the metaP script
 
-### 1.0.0
+### v1.0.0
 
 - Initial release
