@@ -2,9 +2,26 @@
 
 These scripts generate the KEGG aggregations that are used for KEGG search.
 
-A container running on Spin runs the `agg.sh` script, which performs the aggregations periodically (once every 4 hours, by default).
+A container hosted on Spin runs the `agg.sh` script, which performs the aggregations periodically (once every 4 hours, by default).
 
-The container image is currently hosted at: https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator
+## Deployment
+
+Here's how you can build a new version of the container image and push it to the [GitHub Container Registry](https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator):
+
+1. Update the version number in the `VERSION` file.
+   > Use "[`major.minor.patch`](https://semver.org/)" format (e.g. "`1.2.3`").
+2. On GitHub, create a new Release.
+    1. Create a tag.
+       > Name it "`v`" followed by the version number in the `VERSION` file (e.g. "`v1.2.3`").
+    2. Click the "Generate release notes" button.
+    3. Leave the Release title empty (so GitHub reuses the tag name as the Release title).
+    4. Click the "Publish release" button.
+3. Wait 3-4 minutes for the container image to appear on the [GitHub Container Registry](https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator).
+   > Taking a long time? Check the "Actions" tab on GitHub to see the status of the GitHub Actions workflow that builds the image.
+
+The container image will be accessible at: https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator
+
+Once the container image is accessible on the GitHub Container Registry, you can configure a Spin workload to run it.
 
 ## Configuration
 
