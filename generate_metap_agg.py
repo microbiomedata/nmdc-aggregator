@@ -3,7 +3,7 @@ import requests
 from pymongo import MongoClient
 
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 class AnnotationLine():
