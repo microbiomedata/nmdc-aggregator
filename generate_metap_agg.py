@@ -169,7 +169,8 @@ class MetaProtAgg():
             if act_id in done:
                 continue
             try:
-                rows = self.process_activity(actrec)
+                kegg_term_counts = self.process_activity(actrec)
+                rows = kegg_term_counts.values()
 
                 if DEBUG_MODE:
                     print(f"{type(rows)=}")  # print type
