@@ -36,19 +36,4 @@ Now that the container image is hosted there, you can configure a Spin workload 
 
 ## Release Notes
 
-### v1.0.3
-
-- Add some log statements to help with debugging
-
-### v1.0.2
-
-- Configure GitHub Actions to build and push container images to GitHub Container Registry
-- Update `Dockerfile` so that the entrypoint shell script is executable
-
-### v1.0.1
-
-- Fix a bug in the metaP script
-
-### v1.0.0
-
-- Initial release
+https://github.com/microbiomedata/nmdc-aggregator/releases
