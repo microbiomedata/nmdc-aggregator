@@ -36,6 +36,10 @@ Now that the container image is hosted there, you can configure a Spin workload 
 
 ## Release Notes
 
+### v1.0.3
+
+- Add some log statements to help with debugging
+
 ### v1.0.2
 
 - Configure GitHub Actions to build and push container images to GitHub Container Registry
