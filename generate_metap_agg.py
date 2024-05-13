@@ -174,8 +174,7 @@ class MetaProtAgg():
                 if DEBUG_MODE:
                     print(f"{type(rows)=}")  # print type
                     print(f"{len(rows)=}")  # print length
-                    if type(rows) is list and len(rows) > 0:
-                        print(f"{rows[0]}")  # print first row
+                    print(f"{rows=}")  # print the value
 
             except Exception as ex:
                 # Continue on errors
