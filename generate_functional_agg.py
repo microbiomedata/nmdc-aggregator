@@ -20,6 +20,7 @@ class AnnotationLine():
         self.cogs = None
         self.product = None
         self.ec_numbers = None
+        self.pfams = None
 
         if line.find("ko=") > 0:
             annotations = line.split("\t")[8].split(";")
@@ -32,11 +33,13 @@ class AnnotationLine():
                     kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
                     self.kegg = kos.rstrip().split(',')
                 elif anno.startswith("cog="):
-                    self.cogs = anno[4:].split(',')
+                    self.cogs = ['COG:' + cog_id for cog_id in anno[4:].split(',')]
                 elif anno.startswith("product="):
                     self.product = anno[8:]
                 elif anno.startswith("ec_number="):
                     self.ec_numbers = anno[10:].split(",")
+                elif anno.startswith("pfam="):
+                    self.pfams = ['PFAM:' + pfam_id for pfam_id in anno[5:].split(",")]
 
 
 class MetaGenomeFuncAgg():
@@ -55,7 +58,7 @@ class MetaGenomeFuncAgg():
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
 
-    def get_kegg_counts(self, url):
+    def get_functional_annotation_counts(self, url):
         fn = url.replace(self.base_url, self.base_dir)
 
         if os.path.exists(fn):
@@ -67,17 +70,27 @@ class MetaGenomeFuncAgg():
                 raise OSError(f"Failed to read {url}")
             lines = resp.iter_lines()
 
-        kos = {}
+        func_count = {}
         for line in lines:
             if isinstance(line, bytes):
                 line = line.decode()
             anno = AnnotationLine(line)
             if anno.kegg:
                 for ko in anno.kegg:
-                    if ko not in kos:
-                        kos[ko] = 0
-                    kos[ko] += 1
-        return kos
+                    if ko not in func_count:
+                        func_count[ko] = 0
+                    func_count[ko] += 1
+            if anno.cogs:
+                for cog in anno.cogs:
+                    if cog not in func_count:
+                        func_count[cog] = 0
+                    func_count[cog] += 1
+            if anno.pfams:
+                for pfam in anno.pfams:
+                    if pfam not in func_count:
+                        func_count[pfam] = 0
+                    func_count[pfam] += 1
+        return func_count
 
     def find_anno(self, dos):
         """
@@ -102,7 +115,7 @@ class MetaGenomeFuncAgg():
             raise ValueError("Missing url")
         print(f"{act['id']}: {url}")
         id = act['id']
-        cts = self.get_kegg_counts(url)
+        cts = self.get_functional_annotation_counts(url)
 
         rows = []
         for func, ct in cts.items():
