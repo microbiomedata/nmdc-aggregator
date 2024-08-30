@@ -10,7 +10,7 @@ def test_AnnotationLine():
     assert anno.id == "nmdc:wfmgan-11-5rqhd817.1_0000001_2931_5588"
     assert anno.cogs == ["COG:COG0463"]
     assert anno.kegg == ["KEGG.ORTHOLOGY:K20444"]
-    assert anno.pfams == ["PFAM:PF00535","PFAM:PF02836"]
+    assert anno.pfams == ["PFAM:PF00535", "PFAM:PF02836"]
 
 
 def test_functional_annotation_counts(monkeypatch):
