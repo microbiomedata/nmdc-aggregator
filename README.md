@@ -1,11 +1,27 @@
 # Aggregation Scripts
 
-These scripts generate the KEGG aggregations that are used for KEGG search.
+These scripts generate the KEGG/COG/Pfam aggregations that are used for search.
 
 A container hosted on Spin runs the `agg.sh` script, which performs the aggregations periodically (once every 4 hours, by default).
 
 > [!NOTE]  
 > The container image is hosted [here](https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator).
+
+## Test scripts
+
+From the root directory of the repository, run
+```
+$ pytest
+=========================================================== test session starts ============================================================
+platform darwin -- Python 3.8.16, pytest-7.4.3, pluggy-1.3.0
+rootdir: /NMDC/nmdc-aggregator
+collecting ...
+collected 2 items
+tests/test_generate_functional_agg.py ..                                                                                             [100%]
+
+============================================================ 2 passed in 3.92s =============================================================
+
+```
 
 ## Deployment
 
