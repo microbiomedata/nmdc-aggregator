@@ -53,7 +53,8 @@ class MetaGenomeFuncAgg():
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
         self.agg_col = self.db.functional_annotation_agg
-        self.act_col = self.db.metagenome_annotation_activity_set
+        self.mgact_col = self.db.metagenome_annotation_activity_set
+        self.mtact_col = self.db.metatranscriptome_annotation_set
         self.do_col = self.db.data_object_set
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
@@ -131,25 +132,26 @@ class MetaGenomeFuncAgg():
     def sweep(self):
         print("Getting list of indexed objects")
         done = self.agg_col.distinct("metagenome_annotation_id")
-        for actrec in self.act_col.find({}):
-            # New annotations should have this
-            act_id = actrec['id']
-            if act_id in done:
-                continue
-            try:
-                rows = self.process_activity(actrec)
-            except Exception as ex:
-                # Continue on errors
-                print(ex)
-                continue
-            if len(rows) > 0:
-                print(' - %s' % (str(rows[0])))
-                self.agg_col.insert_many(rows)
-            else:
-                print(f' - No rows for {act_id}')
-            if stop:
-                print("quiting")
-                break
+        for act_col in [self.mgact_col, self.mtact_col]:
+            for actrec in act_col.find({}):
+                # New annotations should have this
+                act_id = actrec['id']
+                if act_id in done:
+                    continue
+                try:
+                    rows = self.process_activity(actrec)
+                except Exception as ex:
+                    # Continue on errors
+                    print(ex)
+                    continue
+                if len(rows) > 0:
+                    print(' - %s' % (str(rows[0])))
+                    self.agg_col.insert_many(rows)
+                else:
+                    print(f' - No rows for {act_id}')
+                if stop:
+                    print("quiting")
+                    break
 
 
 if __name__ == "__main__":
