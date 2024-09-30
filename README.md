@@ -1,11 +1,45 @@
 # Aggregation Scripts
 
-These scripts generate the KEGG aggregations that are used for KEGG search.
+These scripts generate the KEGG/COG/Pfam aggregations that are used for search.
 
 A container hosted on Spin runs the `agg.sh` script, which performs the aggregations periodically (once every 4 hours, by default).
 
-> [!NOTE]  
+> [!NOTE]
 > The container image is hosted [here](https://github.com/microbiomedata/nmdc-aggregator/pkgs/container/nmdc-aggregator).
+
+## Development
+
+Here's how you can set up a local development environment:
+
+> Unless otherwise specified, all commands below are designed to be run from the root directory of the repository.
+
+> [!NOTE]
+> These instructions do not cover the process of setting up a local MongoDB server or getting access to the NERSC filesystem.
+
+1. Create and activate a Python virtual environment
+   ```shell
+   python -m venv ./.venv
+   source ./.venv/bin/activate
+   ```
+2. Install Python dependencies
+   ```shell
+   pip install -r requirements.txt
+   ```
+3. Done
+
+### Testing
+
+We use [pytest](https://docs.pytest.org/en/stable/index.html) as our test framework.
+
+Here's how you can run the tests:
+
+> Unless otherwise specified, all commands below are designed to be run from the root directory of the repository.
+
+1. Run the tests
+   ```shell
+   pytest
+   ```
+2. See the test results in the console
 
 ## Deployment
 

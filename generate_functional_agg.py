@@ -20,6 +20,7 @@ class AnnotationLine():
         self.cogs = None
         self.product = None
         self.ec_numbers = None
+        self.pfams = None
 
         if line.find("ko=") > 0:
             annotations = line.split("\t")[8].split(";")
@@ -32,11 +33,13 @@ class AnnotationLine():
                     kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
                     self.kegg = kos.rstrip().split(',')
                 elif anno.startswith("cog="):
-                    self.cogs = anno[4:].split(',')
+                    self.cogs = ['COG:' + cog_id for cog_id in anno[4:].split(',')]
                 elif anno.startswith("product="):
                     self.product = anno[8:]
                 elif anno.startswith("ec_number="):
                     self.ec_numbers = anno[10:].split(",")
+                elif anno.startswith("pfam="):
+                    self.pfams = ['PFAM:' + pfam_id for pfam_id in anno[5:].split(",")]
 
 
 class MetaGenomeFuncAgg():
@@ -50,12 +53,11 @@ class MetaGenomeFuncAgg():
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
         self.agg_col = self.db.functional_annotation_agg
-        self.act_col = self.db.metagenome_annotation_activity_set
         self.do_col = self.db.data_object_set
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
 
-    def get_kegg_counts(self, url):
+    def get_functional_annotation_counts(self, url):
         fn = url.replace(self.base_url, self.base_dir)
 
         if os.path.exists(fn):
@@ -67,17 +69,27 @@ class MetaGenomeFuncAgg():
                 raise OSError(f"Failed to read {url}")
             lines = resp.iter_lines()
 
-        kos = {}
+        func_count = {}
         for line in lines:
             if isinstance(line, bytes):
                 line = line.decode()
             anno = AnnotationLine(line)
             if anno.kegg:
                 for ko in anno.kegg:
-                    if ko not in kos:
-                        kos[ko] = 0
-                    kos[ko] += 1
-        return kos
+                    if ko not in func_count:
+                        func_count[ko] = 0
+                    func_count[ko] += 1
+            if anno.cogs:
+                for cog in anno.cogs:
+                    if cog not in func_count:
+                        func_count[cog] = 0
+                    func_count[cog] += 1
+            if anno.pfams:
+                for pfam in anno.pfams:
+                    if pfam not in func_count:
+                        func_count[pfam] = 0
+                    func_count[pfam] += 1
+        return func_count
 
     def find_anno(self, dos):
         """
@@ -96,13 +108,13 @@ class MetaGenomeFuncAgg():
                 break
         return url
 
-    def process_activity(self, act):
-        url = self.find_anno(act['has_output'])
+    def process_workflow_execution(self, execution_record):
+        url = self.find_anno(execution_record['has_output'])
         if not url:
             raise ValueError("Missing url")
-        print(f"{act['id']}: {url}")
-        id = act['id']
-        cts = self.get_kegg_counts(url)
+        print(f"{execution_record['id']}: {url}")
+        id = execution_record['id']
+        cts = self.get_functional_annotation_counts(url)
 
         rows = []
         for func, ct in cts.items():
@@ -118,13 +130,15 @@ class MetaGenomeFuncAgg():
     def sweep(self):
         print("Getting list of indexed objects")
         done = self.agg_col.distinct("metagenome_annotation_id")
-        for actrec in self.act_col.find({}):
-            # New annotations should have this
-            act_id = actrec['id']
-            if act_id in done:
+        q = {"type": {
+            "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatransciptomeAnnotation"]
+        }}
+        execution_records = self.db.workflow_execution_set.find(q)
+        for execution_record in execution_records:
+            if execution_record['id'] in done:
                 continue
             try:
-                rows = self.process_activity(actrec)
+                rows = self.process_workflow_execution(execution_record)
             except Exception as ex:
                 # Continue on errors
                 print(ex)
@@ -133,7 +147,7 @@ class MetaGenomeFuncAgg():
                 print(' - %s' % (str(rows[0])))
                 self.agg_col.insert_many(rows)
             else:
-                print(f' - No rows for {act_id}')
+                print(f' - No rows for {execution_record["id"]}')
             if stop:
                 print("quiting")
                 break
