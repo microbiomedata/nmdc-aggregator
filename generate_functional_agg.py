@@ -53,8 +53,6 @@ class MetaGenomeFuncAgg():
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
         self.agg_col = self.db.functional_annotation_agg
-        self.mgact_col = self.db.workflow_execution_set
-        self.mtact_col = self.db.workflow_execution_set
         self.do_col = self.db.data_object_set
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
@@ -110,12 +108,12 @@ class MetaGenomeFuncAgg():
                 break
         return url
 
-    def process_activity(self, act):
-        url = self.find_anno(act['has_output'])
+    def process_workflow_execution(self, execution_record):
+        url = self.find_anno(execution_record['has_output'])
         if not url:
             raise ValueError("Missing url")
-        print(f"{act['id']}: {url}")
-        id = act['id']
+        print(f"{execution_record['id']}: {url}")
+        id = execution_record['id']
         cts = self.get_functional_annotation_counts(url)
 
         rows = []
@@ -135,12 +133,12 @@ class MetaGenomeFuncAgg():
         q = {"type": {
             "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatransciptomeAnnotation"]
         }}
-        exec_records = self.db.workflow_execution_set.find(q)
-        for actrec in exec_records:
-            if actrec['id'] in done:
+        execution_records = self.db.workflow_execution_set.find(q)
+        for execution_record in execution_records:
+            if execution_record['id'] in done:
                 continue
             try:
-                rows = self.process_activity(actrec)
+                rows = self.process_workflow_execution(execution_record)
             except Exception as ex:
                 # Continue on errors
                 print(ex)
@@ -149,7 +147,7 @@ class MetaGenomeFuncAgg():
                 print(' - %s' % (str(rows[0])))
                 self.agg_col.insert_many(rows)
             else:
-                print(f' - No rows for {actrec["id"]}')
+                print(f' - No rows for {execution_record["id"]}')
             if stop:
                 print("quiting")
                 break
