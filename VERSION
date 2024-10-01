@@ -1,1 +1,9 @@
-1.0.8
+# You can leave this set to "0.0.0" in the repository.
+#
+# Note: Whenever someone publishes a GitHub Release of this repository,
+#       the GitHub Actions workflow that builds and publishes a new
+#       container image will update this file in the container image
+#       so it contains the Git tag name associated with the Release
+#       (it will typically omit the leading "v" character).
+#
+0.0.0
