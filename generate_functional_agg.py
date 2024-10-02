@@ -131,7 +131,7 @@ class MetaGenomeFuncAgg():
         print("Getting list of indexed objects")
         done = self.agg_col.distinct("metagenome_annotation_id")
         q = {"type": {
-            "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatransciptomeAnnotation"]
+            "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatranscriptomeAnnotation"]
         }}
         execution_records = self.db.workflow_execution_set.find(q)
         for execution_record in execution_records:
