@@ -54,7 +54,7 @@ class MetaProtAgg():
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
         self.agg_col = self.db.metap_gene_function_aggregation
-        self.act_col = self.db.metaproteomics_analysis_activity_set
+        self.act_col = self.db.workflow_execution_set 
         self.do_col = self.db.data_object_set
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
@@ -162,7 +162,7 @@ class MetaProtAgg():
         done = self.agg_col.distinct("metaproteomic_analysis_id")
 
         # Iterate through all of the metaP activities
-        for actrec in self.act_col.find({}):
+        for actrec in self.act_col.find({"type":"nmdc:MetaproteomicsAnalysis"}):
             # New annotations should have this
             act_id = actrec['id']
             # Skip if already processed

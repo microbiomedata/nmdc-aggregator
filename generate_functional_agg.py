@@ -53,8 +53,6 @@ class MetaGenomeFuncAgg():
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
         self.agg_col = self.db.functional_annotation_agg
-        self.mgact_col = self.db.metagenome_annotation_activity_set
-        self.mtact_col = self.db.metatranscriptome_annotation_set
         self.do_col = self.db.data_object_set
         self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
         self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
@@ -110,12 +108,12 @@ class MetaGenomeFuncAgg():
                 break
         return url
 
-    def process_activity(self, act):
-        url = self.find_anno(act['has_output'])
+    def process_workflow_execution(self, execution_record):
+        url = self.find_anno(execution_record['has_output'])
         if not url:
             raise ValueError("Missing url")
-        print(f"{act['id']}: {url}")
-        id = act['id']
+        print(f"{execution_record['id']}: {url}")
+        id = execution_record['id']
         cts = self.get_functional_annotation_counts(url)
 
         rows = []
@@ -132,26 +130,27 @@ class MetaGenomeFuncAgg():
     def sweep(self):
         print("Getting list of indexed objects")
         done = self.agg_col.distinct("metagenome_annotation_id")
-        for act_col in [self.mgact_col, self.mtact_col]:
-            for actrec in act_col.find({}):
-                # New annotations should have this
-                act_id = actrec['id']
-                if act_id in done:
-                    continue
-                try:
-                    rows = self.process_activity(actrec)
-                except Exception as ex:
-                    # Continue on errors
-                    print(ex)
-                    continue
-                if len(rows) > 0:
-                    print(' - %s' % (str(rows[0])))
-                    self.agg_col.insert_many(rows)
-                else:
-                    print(f' - No rows for {act_id}')
-                if stop:
-                    print("quiting")
-                    break
+        q = {"type": {
+            "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatranscriptomeAnnotation"]
+        }}
+        execution_records = self.db.workflow_execution_set.find(q)
+        for execution_record in execution_records:
+            if execution_record['id'] in done:
+                continue
+            try:
+                rows = self.process_workflow_execution(execution_record)
+            except Exception as ex:
+                # Continue on errors
+                print(ex)
+                continue
+            if len(rows) > 0:
+                print(' - %s' % (str(rows[0])))
+                self.agg_col.insert_many(rows)
+            else:
+                print(f' - No rows for {execution_record["id"]}')
+            if stop:
+                print("quiting")
+                break
 
 
 if __name__ == "__main__":
