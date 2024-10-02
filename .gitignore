@@ -1,4 +1,2 @@
 # Python virtual environment (if following instructions in `README.md` verbatim)
 /.venv
-# IntelliJ IDEA project files
-.idea
