@@ -119,7 +119,7 @@ class MetaGenomeFuncAgg():
         rows = []
         for func, ct in cts.items():
             rec = {
-                'metagenome_annotation_id': id,
+                'was_generated_by': id,
                 'gene_function_id': func,
                 'count': ct
                 }
@@ -129,7 +129,7 @@ class MetaGenomeFuncAgg():
 
     def sweep(self):
         print("Getting list of indexed objects")
-        done = self.agg_col.distinct("metagenome_annotation_id")
+        done = self.agg_col.distinct("was_generated_by")
         q = {"type": {
             "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatranscriptomeAnnotation"]
         }}
@@ -161,6 +161,6 @@ if __name__ == "__main__":
 
 # Schema
 #
-#        metagenome_annotation_id        |   gene_function_id    | count
+#        was_generated_by        |   gene_function_id    | count
 # ---------------------------------------+-----------------------+-------
 #  nmdc:006424afe19af3c36c50e2b2e68b9510 | KEGG.ORTHOLOGY:K00001 |   145
