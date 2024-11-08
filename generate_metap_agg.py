@@ -10,18 +10,57 @@ from abc import ABC, abstractmethod
 class Aggregator(ABC):
     """
     Abstract class for Aggregators
+
+    Parameters
+    ----------
+    dev : bool
+        Flag to indicate if production or development API should be used
+        Default is True, which uses the development API
+    
+    Attributes
+    ----------
+    base_url : str
+        Base URL for the API, either production or development
+        "https://api.microbiomedata.org" or "https://api-dev.microbiomedata.org"
+    nmdc_api_token : str
+        API bearer token to access the API
+    aggregation_filter : str
+        Filter to apply to the aggregation collection endpoint to get applicable records (set in subclasses)
+        e.g. '{"metagenome_annotation_id":{"$regex":"wfmp"}}'
+    workflow_filter : str
+        Filter to apply to the workflow collection endpoint to get applicable records (set in subclasses)
+        e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
     """
     def __init__(self, dev=True):
         if dev:
             self.base_url = "https://api-dev.microbiomedata.org"
-            self.nmdc_api_token = os.getenv("NMDC_API_DEV_BEARER_TOKEN")
         else:
             self.base_url = "https://api.microbiomedata.org"
-            self.nmdc_api_token = os.getenv("NMDC_API_BEARER_TOKEN")
-        
+        self.get_bearer_token()
+
         # The following attributes are set in the subclasses
         self.aggregation_filter = ""
         self.workflow_filter = ""
+
+    def get_bearer_token(self):
+        """Function to get the bearer token from the API using the /token endpoint
+
+        Parameters
+        ----------
+        None, but uses the NMDC_API_USERNAME and NMDC_API_PASSWORD environment variables to get the token and set the nmdc_api_token attribute
+        """
+        token_request_body = {
+            "grant_type": "password",
+            "username": os.getenv("NMDC_API_USERNAME"),
+            "password": os.getenv("NMDC_API_PASSWORD"),
+        }
+
+        rv = requests.post(self.base_url + "/token", data=token_request_body)
+        token_response = rv.json()
+        if "access_token" not in token_response:
+            raise Exception(f"Getting token failed: {token_response}")
+        
+        self.nmdc_api_token = token_response["access_token"]
 
     def get_results(
         self, collection: str, filter="", max_page_size=100, fields=""
@@ -78,9 +117,8 @@ class Aggregator(ABC):
 
         return result_list
     
-    def get_previously_aggregated_records(self):
-        """
-        Function to return all ids of activity records that have already been aggregated.
+    def get_previously_aggregated_workflow_ids(self):
+        """Function to return all ids of workflow execution ids that have already been aggregated.
 
         Uses the aggregation_filter attribute to filter the results for subclasses.
 
@@ -98,14 +136,13 @@ class Aggregator(ABC):
         ids = list(set([x["metagenome_annotation_id"] for x in agg_col]))
         return ids
     
-    def get_activity_records(self):
-        """
-        Function to return full workflow execution records in the database
+    def get_workflow_records(self):
+        """Function to return full workflow execution records in the database
 
         Returns
         -------
-        list
-            List of metaproteomics activity records
+        list of dict
+            List of workflow execution records, each represented as a dictionary
         """
         act_col = self.get_results(
             collection="workflow_execution_set", 
@@ -116,13 +153,17 @@ class Aggregator(ABC):
         return act_col
     
     def submit_json_records(self, json_records):
-        """
-        Function to submit aggregation records to the database
+        """Function to submit records to the database using the post /metadata/json:submit endpoint
 
         Parameters
         ----------
         json_records : list
             List of dictionaries where each dictionary represents a record to be submitted to the database
+
+        Returns
+        -------
+        int
+            HTTP status code of the response
         """
         url = f"{self.base_url}/metadata/json:submit"
 
@@ -137,8 +178,7 @@ class Aggregator(ABC):
         return response.status_code
     
     def read_url_tsv(self, url):
-        """
-        Function to read a TSV file's content from a URL and convert it to a list of dictionaries
+        """Function to read a TSV file's content from a URL and convert it to a list of dictionaries
 
         Parameters
         ----------
@@ -167,27 +207,30 @@ class Aggregator(ABC):
         return tsv_data
 
     def sweep(self):
-        """
-        This is the main action function. 
+        """This is the main action function for the Aggregator class.  
         
-        Steps:
+        It performs the following steps:
         1. Get list of workflow IDs that have already been added to the functional_annotation_agg collection
         2. Get list of all applicable workflow in the database, as defined by the workflow_filter attribute
         3. For each workflow that is not in the list of previously aggregated records, process the activity according to the process_activity method
             a. Process the activity according to the process_activity method in the subclass
             b. Prepare a json record for the database with the annotations and counts
             c. Submit json it to the database using the post /metadata/json endpoint
+
+        Returns
+        -------
+        None
         """
         # Get list of workflow IDs that have already been processed
-        mp_wf_in_agg = self.get_previously_aggregated_records()
+        mp_wf_in_agg = self.get_previously_aggregated_workflow_ids()
 
-        # Get list of all metaproteomics activities
-        mp_wf_recs = self.get_activity_records()
+        # Get list of all workflow records
+        mp_wf_recs = self.get_workflow_records()
 
         # Records to add to the aggregation
         agg_records = {}
 
-        # Iterate through all of the metaP activities
+        # Iterate through all of the workflow records
         for mp_wf_rec in mp_wf_recs:
             if mp_wf_rec["id"] in mp_wf_in_agg:
                 continue
@@ -203,21 +246,16 @@ class Aggregator(ABC):
             for key, value in agg_records.items():
                 for k, v in value.items():
                     json_records.append(
-                        {"metagenome_annotation_id": key, "gene_function_id": k, "count": v}
+                        {"metagenome_annotation_id": key, "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
                     )
             json_record_full = {"functional_annotation_agg": json_records}
 
-            # Validate the json record using the post /metadata/json:validate endpoint
-            url = f"{self.base_url}/metadata/json:validate"
-            response = requests.post(url, json=json_record_full)
-
-            # If the json record is valid, submit it to the database using the post /metadata/json endpoint
-            if response.status_code == 200:
-                response = self.submit_json_records(json_records)
-                if response != 200:
-                    print("Error submitting the aggregation records for the workflow: ", mp_wf_rec["id"])
-                if response == 200:
-                    print("Submitted aggregation records for the workflow: ", mp_wf_rec["id"])
+            response = self.submit_json_records(json_record_full)
+            if response != 200:
+                print("Error submitting the aggregation records for the workflow: ", mp_wf_rec["id"],
+                      "Response code: ", response)
+            if response == 200:
+                print("Submitted aggregation records for the workflow: ", mp_wf_rec["id"])
 
     def sweep_success(self):
         """Function to check the results of the sweep and ensure that the records were added to the database
@@ -228,10 +266,10 @@ class Aggregator(ABC):
             True if all records were added to the functional_annotation_agg collection, False otherwise
         """
         # Get list of workflow IDs that have already been processed
-        mp_wf_in_agg = self.get_previously_aggregated_records()
+        mp_wf_in_agg = self.get_previously_aggregated_workflow_ids()
 
-        # Get list of all metaproteomics activities
-        mp_wf_recs = self.get_activity_records()
+        # Get list of all workflow records
+        mp_wf_recs = self.get_workflow_records()
 
         # If there are any records that were not processed, return FALSE
         check = [x for x in mp_wf_recs if x["id"] in mp_wf_in_agg]
@@ -259,7 +297,7 @@ class Aggregator(ABC):
     
 class MetaProtAgg(Aggregator):
     """
-    MetaP Aggregation class
+    Metaproteomics Aggregator class
 
     Parameters
     ----------
@@ -276,8 +314,7 @@ class MetaProtAgg(Aggregator):
     
     Notes
     -----
-    This class is used to aggregate functional annotations from metaproteomics activities in the NMDC database.
-    There must be an environment variable called NMDC_API_TOKEN that contains the API token to access the API.
+    This class is used to aggregate functional annotations from metaproteomics workflows in the NMDC database.
     """
     def __init__(self, dev=True):
         super().__init__(dev)
@@ -285,8 +322,7 @@ class MetaProtAgg(Aggregator):
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
 
     def get_functional_terms_from_protein_report(self, url):
-        """
-        Function to get the functional terms from a URL of a Protein Report
+        """Function to get the functional terms from a URL of a Protein Report
 
         Parameters
         ----------
@@ -296,7 +332,7 @@ class MetaProtAgg(Aggregator):
         Returns
         -------
         dict
-            Dictionary of KO, COG, and pfam terms with their respective spectral counts
+            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the Protein Report
         """
         fxns = {}
 
