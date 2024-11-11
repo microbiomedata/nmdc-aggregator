@@ -272,7 +272,7 @@ class Aggregator(ABC):
         mp_wf_recs = self.get_workflow_records()
 
         # If there are any records that were not processed, return FALSE
-        check = [x for x in mp_wf_recs if x["id"] in mp_wf_in_agg]
+        check = [x["id"] in mp_wf_in_agg for x in mp_wf_recs]
         if all(check):
             return True
         else:
@@ -445,6 +445,7 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp_dev = MetaProtAgg()
+    mp_dev.sweep_success()
     mp_dev.sweep()
 
     # Wait for the records to be added to the database before running check (5 minutes)
