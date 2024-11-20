@@ -26,7 +26,7 @@ class Aggregator(ABC):
         API bearer token to access the API
     aggregation_filter : str
         Filter to apply to the aggregation collection endpoint to get applicable records (set in subclasses)
-        e.g. '{"metagenome_annotation_id":{"$regex":"wfmp"}}'
+        e.g. '{"was_generated_by":{"$regex":"wfmp"}}'
     workflow_filter : str
         Filter to apply to the workflow collection endpoint to get applicable records (set in subclasses)
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
@@ -73,7 +73,7 @@ class Aggregator(ABC):
             Collection name to query, e.g. "functional_annotation_agg"
         filter : str, optional
             Filter to apply to the query written in JSON format for MongoDB
-            e.g. '{"metagenome_annotation_id":{"$regex":"wfmp"}}'
+            e.g. '{"was_generated_by":{"$regex":"wfmp"}}'
             Default is an empty string, which does not apply a filter
         max_page_size : int, optional
             Maximum number of records to return in a single page
@@ -131,9 +131,9 @@ class Aggregator(ABC):
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
             max_page_size=1000,
-            fields="metagenome_annotation_id",
+            fields="was_generated_by",
         )
-        ids = list(set([x["metagenome_annotation_id"] for x in agg_col]))
+        ids = list(set([x["was_generated_by"] for x in agg_col]))
         return ids
     
     def get_workflow_records(self):
@@ -212,10 +212,10 @@ class Aggregator(ABC):
         It performs the following steps:
         1. Get list of workflow IDs that have already been added to the functional_annotation_agg collection
         2. Get list of all applicable workflow in the database, as defined by the workflow_filter attribute
-        3. For each workflow that is not in the list of previously aggregated records, process the activity according to the process_activity method
+        3. For each workflow that is not in the list of previously aggregated records:
             a. Process the activity according to the process_activity method in the subclass
             b. Prepare a json record for the database with the annotations and counts
-            c. Submit json it to the database using the post /metadata/json endpoint
+            c. Submit json to the database using the post /metadata/json endpoint
 
         Returns
         -------
@@ -246,7 +246,7 @@ class Aggregator(ABC):
             for key, value in agg_records.items():
                 for k, v in value.items():
                     json_records.append(
-                        {"metagenome_annotation_id": key, "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
+                        {"was_generated_by": key, "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
                     )
             json_record_full = {"functional_annotation_agg": json_records}
 
@@ -318,7 +318,7 @@ class MetaProtAgg(Aggregator):
     """
     def __init__(self, dev=True):
         super().__init__(dev)
-        self.aggregation_filter = '{"metagenome_annotation_id":{"$regex":"wfmp"}}'
+        self.aggregation_filter = '{"was_generated_by":{"$regex":"wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
 
     def get_functional_terms_from_protein_report(self, url):
@@ -445,10 +445,9 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp_dev = MetaProtAgg()
-    mp_dev.sweep_success()
     mp_dev.sweep()
 
-    # Wait for the records to be added to the database before running check (5 minutes)
+    # Wait for the records to be added to the database before running check (5 minutes?)
     time.sleep(300)
     success_check = mp_dev.sweep_success()
 
