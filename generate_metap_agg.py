@@ -2,20 +2,12 @@ import requests
 import csv
 import io
 import os
-import time
 from abc import ABC, abstractmethod
-
-# TODO KRH: Change metagmetagenome_anlaysis_id to was_generated_by throughout after https://github.com/microbiomedata/nmdc-schema/pull/2203 has been merged and data have been migrated
 
 class Aggregator(ABC):
     """
     Abstract class for Aggregators
 
-    Parameters
-    ----------
-    dev : bool
-        Flag to indicate if production or development API should be used
-        Default is True, which uses the development API
     
     Attributes
     ----------
@@ -31,11 +23,11 @@ class Aggregator(ABC):
         Filter to apply to the workflow collection endpoint to get applicable records (set in subclasses)
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
     """
-    def __init__(self, dev=True):
-        if dev:
-            self.base_url = "https://api-dev.microbiomedata.org"
-        else:
-            self.base_url = "https://api.microbiomedata.org"
+    # Set the base URL for the API
+    _NMDC_API_URL = "https://api-dev.microbiomedata.org"
+
+    def __init__(self):
+        self.base_url = os.getenv("NMDC_API_URL") or self._NMDC_API_URL
         self.get_bearer_token()
 
         # The following attributes are set in the subclasses
@@ -316,8 +308,8 @@ class MetaProtAgg(Aggregator):
     -----
     This class is used to aggregate functional annotations from metaproteomics workflows in the NMDC database.
     """
-    def __init__(self, dev=True):
-        super().__init__(dev)
+    def __init__(self):
+        super().__init__()
         self.aggregation_filter = '{"was_generated_by":{"$regex":"wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
 
@@ -446,19 +438,3 @@ class MetaProtAgg(Aggregator):
 if __name__ == "__main__":
     mp_dev = MetaProtAgg()
     mp_dev.sweep()
-
-    # Wait for the records to be added to the database before running check (5 minutes?)
-    time.sleep(300)
-    success_check = mp_dev.sweep_success()
-
-"""
-# This is commented out until script is ready for production
-    if success_check:
-        # Reprocess in the production API
-        mp_prod = MetaProtAgg(dev=False)
-        mp_prod.sweep()
-
-        # Wait for the records to be added to the database before running check (5 minutes)
-        time.sleep(300)
-        success_check = mp_prod.sweep_success()
-"""

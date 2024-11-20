@@ -65,8 +65,9 @@ Now that the container image is hosted there, you can configure a Spin workload 
 - `POLL_TIME`: Number of seconds to sleep between each run (Default: `14400`, which is 4 hours)
 - `NMDC_BASE_URL`: Base URL to access the data (Default: `https://data.microbiomedata.org/data`)
 - `NMDC_BASE_PATH`: Base path to the data on disk (Default: `/global/cfs/cdirs/m3408/results`)
-- `NMDC_CLIENT_ID`: Client ID for interacting with NMDC's runtime API (used for both dev and production)
-- `NMDC_CLIENT_PW`: Password for interacting with NMDC's runtime API, production
+- `NMDC_CLIENT_ID`: Client ID for interacting with NMDC's runtime API
+- `NMDC_CLIENT_PW`: Password for interacting with NMDC's runtime API
+- `NMDC_API_URL`: Base url for NMCD runtime API (Default: `https://api-dev.microbiomedata.org`, which is the dev url)
 
 ## Release Notes
 
