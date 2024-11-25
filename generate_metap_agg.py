@@ -436,5 +436,5 @@ class MetaProtAgg(Aggregator):
   
 
 if __name__ == "__main__":
-    mp_dev = MetaProtAgg()
-    mp_dev.sweep()
+    mp = MetaProtAgg()
+    mp.sweep()
