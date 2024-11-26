@@ -122,7 +122,9 @@ class Aggregator(ABC):
         agg_col = self.get_results(
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
-            max_page_size=1000,
+            #FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection - see issue: 
+            # https://github.com/microbiomedata/nmdc-runtime/issues/797
+            max_page_size=0,
             fields="was_generated_by",
         )
         ids = list(set([x["was_generated_by"] for x in agg_col]))
@@ -437,4 +439,4 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp = MetaProtAgg()
-    mp.sweep()
+    mp.sweep_success()
