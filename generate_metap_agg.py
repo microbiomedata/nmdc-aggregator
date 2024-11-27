@@ -327,7 +327,7 @@ class MetaProtAgg(Aggregator):
 
     def __init__(self):
         super().__init__()
-        self.aggregation_filter = '{"was_generated_by":{"$regex":"wfmp"}}'
+        self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
 
     def get_functional_terms_from_protein_report(self, url):
