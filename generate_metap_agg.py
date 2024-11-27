@@ -221,15 +221,13 @@ class Aggregator(ABC):
         # Get list of all workflow records
         mp_wf_recs = self.get_workflow_records()
 
-        # Records to add to the aggregation
-        agg_records = {}
-
         # Iterate through all of the workflow records
         for mp_wf_rec in mp_wf_recs:
+            
             if mp_wf_rec["id"] in mp_wf_in_agg:
                 continue
             try:
-                agg_records[mp_wf_rec["id"]] = self.process_activity(mp_wf_rec)
+                functional_agg_dict = self.process_activity(mp_wf_rec)
             except Exception as ex:
                 # Continue on errors
                 print(ex)
@@ -237,11 +235,10 @@ class Aggregator(ABC):
 
             # Prepare a  json record for the database
             json_records = []
-            for key, value in agg_records.items():
-                for k, v in value.items():
-                    json_records.append(
-                        {"was_generated_by": key, "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
-                    )
+            for k, v in functional_agg_dict.items():
+                json_records.append(
+                    {"was_generated_by": mp_wf_rec["id"], "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
+                )
             json_record_full = {"functional_annotation_agg": json_records}
 
             response = self.submit_json_records(json_record_full)
@@ -439,4 +436,4 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp = MetaProtAgg()
-    mp.sweep_success()
+    mp.sweep()
