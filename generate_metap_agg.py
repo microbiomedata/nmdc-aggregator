@@ -3,6 +3,12 @@ import csv
 import io
 import os
 from abc import ABC, abstractmethod
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
+
 
 class Aggregator(ABC):
     """
@@ -50,8 +56,8 @@ class Aggregator(ABC):
         rv = requests.post(self.base_url + "/token", data=token_request_body)
         token_response = rv.json()
         if "access_token" not in token_response:
-            raise Exception(f"Getting token failed: {token_response}")
-        
+            logger.error(f"Getting token failed: {token_response}, Status code: {rv.status_code}")
+            raise Exception(f"Getting token failed: {token_response}, Status code: {rv.status_code}")        
         self.nmdc_api_token = token_response["access_token"]
 
     def get_results(
@@ -229,8 +235,8 @@ class Aggregator(ABC):
             try:
                 functional_agg_dict = self.process_activity(mp_wf_rec)
             except Exception as ex:
-                # Continue on errors
-                print(ex)
+                # Log the error and continue to the next record
+                logger.error(f"Error processing activity {mp_wf_rec['id']}: {ex}")
                 continue
 
             # Prepare a  json record for the database
@@ -243,8 +249,7 @@ class Aggregator(ABC):
 
             response = self.submit_json_records(json_record_full)
             if response != 200:
-                print("Error submitting the aggregation records for the workflow: ", mp_wf_rec["id"],
-                      "Response code: ", response)
+                logger.error(f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}")
             if response == 200:
                 print("Submitted aggregation records for the workflow: ", mp_wf_rec["id"])
 
