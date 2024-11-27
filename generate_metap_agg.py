@@ -14,7 +14,7 @@ class Aggregator(ABC):
     """
     Abstract class for Aggregators
 
-    
+
     Attributes
     ----------
     base_url : str
@@ -29,6 +29,7 @@ class Aggregator(ABC):
         Filter to apply to the workflow collection endpoint to get applicable records (set in subclasses)
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
     """
+
     # Set the base URL for the API
     _NMDC_API_URL = "https://api-dev.microbiomedata.org"
 
@@ -56,15 +57,17 @@ class Aggregator(ABC):
         rv = requests.post(self.base_url + "/token", data=token_request_body)
         token_response = rv.json()
         if "access_token" not in token_response:
-            logger.error(f"Getting token failed: {token_response}, Status code: {rv.status_code}")
-            raise Exception(f"Getting token failed: {token_response}, Status code: {rv.status_code}")        
+            logger.error(
+                f"Getting token failed: {token_response}, Status code: {rv.status_code}"
+            )
+            raise Exception(
+                f"Getting token failed: {token_response}, Status code: {rv.status_code}"
+            )
         self.nmdc_api_token = token_response["access_token"]
 
-    def get_results(
-        self, collection: str, filter="", max_page_size=100, fields=""
-    ):
+    def get_results(self, collection: str, filter="", max_page_size=100, fields=""):
         """General function to get results from the API using the collection endpoint with optional filter and fields
-        
+
         Parameters
         ----------
         collection : str
@@ -114,7 +117,7 @@ class Aggregator(ABC):
                     break
 
         return result_list
-    
+
     def get_previously_aggregated_workflow_ids(self):
         """Function to return all ids of workflow execution ids that have already been aggregated.
 
@@ -128,14 +131,14 @@ class Aggregator(ABC):
         agg_col = self.get_results(
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
-            #FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection - see issue: 
+            # FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection - see issue:
             # https://github.com/microbiomedata/nmdc-runtime/issues/797
             max_page_size=0,
             fields="was_generated_by",
         )
         ids = list(set([x["was_generated_by"] for x in agg_col]))
         return ids
-    
+
     def get_workflow_records(self):
         """Function to return full workflow execution records in the database
 
@@ -145,13 +148,13 @@ class Aggregator(ABC):
             List of workflow execution records, each represented as a dictionary
         """
         act_col = self.get_results(
-            collection="workflow_execution_set", 
-            filter=self.workflow_filter, 
-            max_page_size=1000, 
-            fields=""
+            collection="workflow_execution_set",
+            filter=self.workflow_filter,
+            max_page_size=1000,
+            fields="",
         )
         return act_col
-    
+
     def submit_json_records(self, json_records):
         """Function to submit records to the database using the post /metadata/json:submit endpoint
 
@@ -170,13 +173,13 @@ class Aggregator(ABC):
         headers = {
             "accept": "application/json",
             "Authorization": f"Bearer {self.nmdc_api_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         response = requests.post(url, headers=headers, json=json_records)
 
         return response.status_code
-    
+
     def read_url_tsv(self, url):
         """Function to read a TSV file's content from a URL and convert it to a list of dictionaries
 
@@ -184,7 +187,7 @@ class Aggregator(ABC):
         ----------
         url : str
             URL to the TSV file
-        
+
         Returns
         -------
         list
@@ -207,8 +210,8 @@ class Aggregator(ABC):
         return tsv_data
 
     def sweep(self):
-        """This is the main action function for the Aggregator class.  
-        
+        """This is the main action function for the Aggregator class.
+
         It performs the following steps:
         1. Get list of workflow IDs that have already been added to the functional_annotation_agg collection
         2. Get list of all applicable workflow in the database, as defined by the workflow_filter attribute
@@ -229,7 +232,6 @@ class Aggregator(ABC):
 
         # Iterate through all of the workflow records
         for mp_wf_rec in mp_wf_recs:
-            
             if mp_wf_rec["id"] in mp_wf_in_agg:
                 continue
             try:
@@ -243,19 +245,28 @@ class Aggregator(ABC):
             json_records = []
             for k, v in functional_agg_dict.items():
                 json_records.append(
-                    {"was_generated_by": mp_wf_rec["id"], "gene_function_id": k, "count": v, "type": "nmdc:FunctionalAnnotationAggMember"}
+                    {
+                        "was_generated_by": mp_wf_rec["id"],
+                        "gene_function_id": k,
+                        "count": v,
+                        "type": "nmdc:FunctionalAnnotationAggMember",
+                    }
                 )
             json_record_full = {"functional_annotation_agg": json_records}
 
             response = self.submit_json_records(json_record_full)
             if response != 200:
-                logger.error(f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}")
+                logger.error(
+                    f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}"
+                )
             if response == 200:
-                print("Submitted aggregation records for the workflow: ", mp_wf_rec["id"])
+                print(
+                    "Submitted aggregation records for the workflow: ", mp_wf_rec["id"]
+                )
 
     def sweep_success(self):
         """Function to check the results of the sweep and ensure that the records were added to the database
-        
+
         Returns
         -------
         bool
@@ -272,7 +283,7 @@ class Aggregator(ABC):
         if all(check):
             return True
         else:
-            return False  
+            return False
 
     @abstractmethod
     def process_activity(self, act):
@@ -283,14 +294,15 @@ class Aggregator(ABC):
         ----------
         act : dict
             Activity record to process
-        
+
         Returns
         -------
         dict
             Dictionary of functional annotations with their respective counts
         """
         pass
-    
+
+
 class MetaProtAgg(Aggregator):
     """
     Metaproteomics Aggregator class
@@ -307,11 +319,12 @@ class MetaProtAgg(Aggregator):
         Base URL for the API
     nmdc_api_token : str
         API token to access the API
-    
+
     Notes
     -----
     This class is used to aggregate functional annotations from metaproteomics workflows in the NMDC database.
     """
+
     def __init__(self):
         super().__init__()
         self.aggregation_filter = '{"was_generated_by":{"$regex":"wfmp"}}'
@@ -345,7 +358,7 @@ class MetaProtAgg(Aggregator):
                     fxns[ko_clean] = int(line.get("SummedSpectraCounts"))
                 else:
                     fxns[ko_clean] += int(line.get("SummedSpectraCounts"))
-            
+
             # Add cog terms to the dictionary
             cog = line.get("COG")
             if cog != "" and cog is not None:
@@ -354,7 +367,7 @@ class MetaProtAgg(Aggregator):
                     fxns[cog_clean] = int(line.get("SummedSpectraCounts"))
                 else:
                     fxns[cog_clean] += int(line.get("SummedSpectraCounts"))
-            
+
             # Add pfam terms to the dictionary
             pfam = line.get("pfam")
             if pfam != "" and pfam is not None:
@@ -363,7 +376,6 @@ class MetaProtAgg(Aggregator):
                     fxns[pfam_clean] = int(line.get("SummedSpectraCounts"))
                 else:
                     fxns[pfam_clean] += int(line.get("SummedSpectraCounts"))
-        
 
         # For all, loop through keys and separate into multiple keys if there are multiple pfams
         new_fxns = {}
@@ -437,7 +449,7 @@ class MetaProtAgg(Aggregator):
 
         # Parse the KEGG, COG, and PFAM annotations
         return self.get_functional_terms_from_protein_report(url)
-  
+
 
 if __name__ == "__main__":
     mp = MetaProtAgg()
