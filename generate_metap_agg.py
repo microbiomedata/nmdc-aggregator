@@ -24,7 +24,8 @@ class Aggregator(ABC):
         API bearer token to access the API
     aggregation_filter : str
         Filter to apply to the aggregation collection endpoint to get applicable records (set in subclasses)
-        e.g. '{"was_generated_by":{"$regex":"wfmp"}}'
+        Note the use of the ^ character to match the beginning of the string which optimizes the query
+        e.g. '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
     workflow_filter : str
         Filter to apply to the workflow collection endpoint to get applicable records (set in subclasses)
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
@@ -91,6 +92,7 @@ class Aggregator(ABC):
         resp = requests.get(og_url)
         initial_data = resp.json()
         results = initial_data.get("resources", [])
+        i = 0
 
         if results == []:
             # if no results are returned
@@ -105,6 +107,8 @@ class Aggregator(ABC):
             next_page_token = initial_data["next_page_token"]
 
             while True:
+                i = i + max_page_size
+                print(str(i) + " records processed")
                 url = f"{self.base_url}/nmdcschema/{collection}?&filter={filter}&max_page_size={max_page_size}&next_page_token={next_page_token}&projection={fields}"
                 response = requests.get(url)
                 data_next = response.json()
@@ -131,8 +135,8 @@ class Aggregator(ABC):
         agg_col = self.get_results(
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
-            # FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection - see issue:
-            # https://github.com/microbiomedata/nmdc-runtime/issues/797
+            # FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection but pagination gets stuck in infinite loop
+            # see issue: https://github.com/microbiomedata/nmdc-runtime/issues/806
             max_page_size=0,
             fields="was_generated_by",
         )
@@ -312,13 +316,6 @@ class MetaProtAgg(Aggregator):
     dev : bool
         Flag to indicate if production or development API should be used
         Default is True, which uses the development API
-
-    Attributes
-    ----------
-    base_url : str
-        Base URL for the API
-    nmdc_api_token : str
-        API token to access the API
 
     Notes
     -----
