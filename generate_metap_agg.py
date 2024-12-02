@@ -108,8 +108,7 @@ class Aggregator(ABC):
 
             while True:
                 i = i + max_page_size
-                print(str(i) + " records processed")
-                url = f"{self.base_url}/nmdcschema/{collection}?&filter={filter}&max_page_size={max_page_size}&next_page_token={next_page_token}&projection={fields}"
+                url = f"{self.base_url}/nmdcschema/{collection}?&filter={filter}&max_page_size={max_page_size}&page_token={next_page_token}&projection={fields}"
                 response = requests.get(url)
                 data_next = response.json()
 
@@ -135,9 +134,7 @@ class Aggregator(ABC):
         agg_col = self.get_results(
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
-            # FIXME: Using max_page_size of 0 may not work as we scale up the functional_annotation_agg collection but pagination gets stuck in infinite loop
-            # see issue: https://github.com/microbiomedata/nmdc-runtime/issues/806
-            max_page_size=0,
+            max_page_size=10000,
             fields="was_generated_by",
         )
         ids = list(set([x["was_generated_by"] for x in agg_col]))
@@ -154,9 +151,7 @@ class Aggregator(ABC):
         act_col = self.get_results(
             collection="workflow_execution_set",
             filter=self.workflow_filter,
-            # FIXME: Using max_page_size of 0 may not work as we scale up the workflow_execution_set collection but pagination gets stuck in infinite loop
-            # see issue: https://github.com/microbiomedata/nmdc-runtime/issues/806
-            max_page_size=0,
+            max_page_size=500,
             fields="",
         )
         return act_col
