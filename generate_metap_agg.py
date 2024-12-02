@@ -154,7 +154,9 @@ class Aggregator(ABC):
         act_col = self.get_results(
             collection="workflow_execution_set",
             filter=self.workflow_filter,
-            max_page_size=1000,
+            # FIXME: Using max_page_size of 0 may not work as we scale up the workflow_execution_set collection but pagination gets stuck in infinite loop
+            # see issue: https://github.com/microbiomedata/nmdc-runtime/issues/806
+            max_page_size=0,
             fields="",
         )
         return act_col
