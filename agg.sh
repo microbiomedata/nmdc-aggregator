@@ -13,7 +13,7 @@ fi
 while true ; do
         date |tee -a $LOG_FILE
         python -m generate_functional_agg |tee -a $LOG_FILE
-        python -m generate_metap_agg |tee -a $LOG_FILE
+        python -m generate_metap_agg 2>&1 |tee -a $LOG_FILE
         echo "Sleeping $POLL_TIME"
         sleep $POLL_TIME
 done
