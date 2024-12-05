@@ -50,9 +50,9 @@ class Aggregator(ABC):
         None, but uses the NMDC_API_USERNAME and NMDC_API_PASSWORD environment variables to get the token and set the nmdc_api_token attribute
         """
         token_request_body = {
-            "grant_type": "password",
-            "username": os.getenv("NMDC_API_USERNAME"),
-            "password": os.getenv("NMDC_API_PASSWORD"),
+            "grant_type": "client_credentials",
+            "client_id": os.getenv("NMDC_API_USERNAME"),
+            "client_secret": os.getenv("NMDC_API_PASSWORD"),
         }
 
         rv = requests.post(self.base_url + "/token", data=token_request_body)
