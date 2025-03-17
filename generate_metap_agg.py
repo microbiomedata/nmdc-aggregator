@@ -349,27 +349,27 @@ class MetaProtAgg(Aggregator):
                 # Replace KO: with KEGG.ORTHOLOGY:
                 ko_clean = ko.replace("KO:", "KEGG.ORTHOLOGY:")
                 if ko_clean not in fxns.keys():
-                    fxns[ko_clean] = int(line.get("SummedSpectraCounts"))
+                    fxns[ko_clean] = int(float(line.get("SummedSpectraCounts")))
                 else:
-                    fxns[ko_clean] += int(line.get("SummedSpectraCounts"))
+                    fxns[ko_clean] += int(float(line.get("SummedSpectraCounts")))
 
             # Add cog terms to the dictionary
             cog = line.get("COG")
             if cog != "" and cog is not None:
                 cog_clean = "COG:" + cog
                 if cog_clean not in fxns.keys():
-                    fxns[cog_clean] = int(line.get("SummedSpectraCounts"))
+                    fxns[cog_clean] = int(float(line.get("SummedSpectraCounts")))
                 else:
-                    fxns[cog_clean] += int(line.get("SummedSpectraCounts"))
+                    fxns[cog_clean] += int(float(line.get("SummedSpectraCounts")))
 
             # Add pfam terms to the dictionary
             pfam = line.get("pfam")
             if pfam != "" and pfam is not None:
                 pfam_clean = "PFAM:" + pfam
                 if pfam_clean not in fxns.keys():
-                    fxns[pfam_clean] = int(line.get("SummedSpectraCounts"))
+                    fxns[pfam_clean] = int(float(line.get("SummedSpectraCounts")))
                 else:
-                    fxns[pfam_clean] += int(line.get("SummedSpectraCounts"))
+                    fxns[pfam_clean] += int(float(line.get("SummedSpectraCounts")))
 
         # For all, loop through keys and separate into multiple keys if there are multiple pfams
         new_fxns = {}
