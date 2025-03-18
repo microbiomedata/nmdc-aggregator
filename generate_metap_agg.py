@@ -348,58 +348,21 @@ class MetaProtAgg(Aggregator):
         self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
     
-    def get_functional_terms_from_protein_report(self, url, url_pep):
+    def get_functional_terms_from_protein_report(self, url):
         """Function to get the functional terms from a URL of a Protein Report
 
         Parameters
         ----------
         url : str
-            URL to the Protein Report
+            URL to the Peptide Report
 
         Returns
         -------
         dict
             Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the Protein Report
         """
-        fxns = {}
-
-        content = self.read_url_tsv(url)
-
-        # Parse the Protein Report content into KO, COG, and Pfam terms
-        for line in content:
-            annotations = []
-            spectral_counts = int(float(line.get("SummedSpectraCounts")))
-
-            # Add ko terms to the dictionary
-            ko = line.get("KO")
-            if ko != "" and ko is not None:
-                for ko_term in ko.split(","):
-                    # Replace KO: with KEGG.ORTHOLOGY:
-                    ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
-                    annotations.append(ko_clean)
-
-            # Add cog terms to the dictionary
-            cog = line.get("COG")
-            if cog != "" and cog is not None:
-                for cog_term in cog.split(","):
-                    cog_clean = "COG:" + cog_term.strip()
-                    annotations.append(cog_clean)
-
-            # Add pfam terms to the dictionary
-            pfam = line.get("pfam")
-            if pfam != "" and pfam is not None:
-                for pfam_term in pfam.split(","):
-                    pfam_clean = "PFAM:" + pfam_term.strip()
-                    annotations.append(pfam_clean)
-            
-            # Add the annotations to the dictionary
-            for annotation in annotations:
-                fxns = self.add_to_dict(fxns, annotation, spectral_counts)
-
-        protein_annotations = list(set(fxns.keys()))
-
         # Parse the Peptide Report content into KO, COG, and Pfam terms
-        content_pep = self.read_url_tsv(url_pep)
+        content_pep = self.read_url_tsv(url)
         pep_dict = {}
         for line in content_pep:
             peptide_sequence = line.get("peptide_sequence")
@@ -444,21 +407,7 @@ class MetaProtAgg(Aggregator):
             for annotation in pep_single_dict["annotations"]:
                 pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
 
-        peptide_annotations = list(set(pep_fxns.keys()))
-
-        # Check that all of the protein annotations are in the peptide annotations and vice versa
-        if not all([x in peptide_annotations for x in protein_annotations]):
-            logger.error(f"Protein annotations: {protein_annotations}")
-            logger.error(f"Peptide annotations: {peptide_annotations}")
-            raise ValueError("Protein and peptide annotations do not match")
-        if not all([x in protein_annotations for x in peptide_annotations]):
-            logger.error(f"Protein annotations: {protein_annotations}")
-            logger.error(f"Peptide annotations: {peptide_annotations}")
-            raise ValueError("Protein and peptide annotations do not match")
-
-
-
-        return fxns
+        return pep_fxns
 
     def find_protein_report_url(self, dos):
         """Find the URL for the protein report from a list of data object IDs
@@ -542,13 +491,12 @@ class MetaProtAgg(Aggregator):
             e.g. {"KEGG.ORTHOLOGY:K00001": 100, "COG:C00001": 50, "PFAM:PF00001": 25}
         """
         # Get the URL and ID
-        url = self.find_protein_report_url(act["has_output"])
-        url_pep = self.find_peptide_report_url(act["has_output"])
+        url = self.find_peptide_report_url(act["has_output"])
         if not url:
             raise ValueError(f"Missing url for {act['id']}")
 
         # Parse the KEGG, COG, and PFAM annotations
-        return self.get_functional_terms_from_protein_report(url, url_pep)
+        return self.get_functional_terms_from_protein_report(url)
 
 
 if __name__ == "__main__":
