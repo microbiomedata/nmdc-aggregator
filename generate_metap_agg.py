@@ -41,7 +41,31 @@ class Aggregator(ABC):
         # The following attributes are set in the subclasses
         self.aggregation_filter = ""
         self.workflow_filter = ""
+    
+    @staticmethod
+    def add_to_dict(d, k, v):
+        """Function to add a value to a dictionary key, summing the values if the key already exists
 
+        Parameters
+        ----------
+        d : dict
+            Dictionary to add the key and value to
+        k : str
+            Key to add to the dictionary
+        v : int
+            Value to add to the key in the dictionary
+
+        Returns
+        -------
+        dict
+            Dictionary with the key and value added
+        """
+        if k in d.keys():
+            d[k] += v
+        else:
+            d[k] = v
+        return d
+    
     def get_bearer_token(self):
         """Function to get the bearer token from the API using the /token endpoint
 
@@ -323,8 +347,8 @@ class MetaProtAgg(Aggregator):
         super().__init__()
         self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
-
-    def get_functional_terms_from_protein_report(self, url):
+    
+    def get_functional_terms_from_protein_report(self, url, url_pep):
         """Function to get the functional terms from a URL of a Protein Report
 
         Parameters
@@ -343,50 +367,98 @@ class MetaProtAgg(Aggregator):
 
         # Parse the Protein Report content into KO, COG, and Pfam terms
         for line in content:
+            annotations = []
+            spectral_counts = int(float(line.get("SummedSpectraCounts")))
+
             # Add ko terms to the dictionary
             ko = line.get("KO")
             if ko != "" and ko is not None:
-                # Replace KO: with KEGG.ORTHOLOGY:
-                ko_clean = ko.replace("KO:", "KEGG.ORTHOLOGY:")
-                if ko_clean not in fxns.keys():
-                    fxns[ko_clean] = int(float(line.get("SummedSpectraCounts")))
-                else:
-                    fxns[ko_clean] += int(float(line.get("SummedSpectraCounts")))
+                for ko_term in ko.split(","):
+                    # Replace KO: with KEGG.ORTHOLOGY:
+                    ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
+                    annotations.append(ko_clean)
 
             # Add cog terms to the dictionary
             cog = line.get("COG")
             if cog != "" and cog is not None:
-                cog_clean = "COG:" + cog
-                if cog_clean not in fxns.keys():
-                    fxns[cog_clean] = int(float(line.get("SummedSpectraCounts")))
-                else:
-                    fxns[cog_clean] += int(float(line.get("SummedSpectraCounts")))
+                for cog_term in cog.split(","):
+                    cog_clean = "COG:" + cog_term.strip()
+                    annotations.append(cog_clean)
 
             # Add pfam terms to the dictionary
             pfam = line.get("pfam")
             if pfam != "" and pfam is not None:
-                pfam_clean = "PFAM:" + pfam
-                if pfam_clean not in fxns.keys():
-                    fxns[pfam_clean] = int(float(line.get("SummedSpectraCounts")))
-                else:
-                    fxns[pfam_clean] += int(float(line.get("SummedSpectraCounts")))
+                for pfam_term in pfam.split(","):
+                    pfam_clean = "PFAM:" + pfam_term.strip()
+                    annotations.append(pfam_clean)
+            
+            # Add the annotations to the dictionary
+            for annotation in annotations:
+                fxns = self.add_to_dict(fxns, annotation, spectral_counts)
 
-        # For all, loop through keys and separate into multiple keys if there are multiple pfams
-        new_fxns = {}
-        for k, v in fxns.items():
-            if "," in k:
-                for pfam in k.split(","):
-                    # Check if pfam is already "PFAM:" prefixed
-                    if not pfam.startswith("PFAM:"):
-                        pfam = "PFAM:" + pfam
-                    if pfam not in new_fxns.keys():
-                        new_fxns[pfam] = v
-                    else:
-                        new_fxns[pfam] += v
-            else:
-                new_fxns[k] = v
+        protein_annotations = list(set(fxns.keys()))
 
-        return new_fxns
+        # Parse the Peptide Report content into KO, COG, and Pfam terms
+        content_pep = self.read_url_tsv(url_pep)
+        pep_dict = {}
+        for line in content_pep:
+            peptide_sequence = line.get("peptide_sequence")
+            
+            # Add the peptide sequence and spectral count to the dictionary and initialize the annotations list
+            if peptide_sequence not in pep_dict:
+                pep_dict[peptide_sequence] = {}
+                pep_dict[peptide_sequence]["spectral_counts"] = int(float(line.get("peptide_spectral_count")))
+                pep_dict[peptide_sequence]["annotations"] = []
+            
+            annotations = []
+
+            # Add ko terms to the dictionary
+            ko = line.get("KO")
+            if ko != "" and ko is not None:
+                for ko_term in ko.split(","):
+                    # Replace KO: with KEGG.ORTHOLOGY:
+                    ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
+                    annotations.append(ko_clean)
+
+            # Add cog terms to the dictionary
+            cog = line.get("COG")
+            if cog != "" and cog is not None:
+                for cog_term in cog.split(","):
+                    cog_clean = "COG:" + cog_term.strip()
+                    annotations.append(cog_clean)
+
+            # Add pfam terms to the dictionary
+            pfam = line.get("pfam")
+            if pfam != "" and pfam is not None:
+                for pfam_term in pfam.split(","):
+                    pfam_clean = "PFAM:" + pfam_term.strip()
+                    annotations.append(pfam_clean)
+            
+            # Add the annotations to the dictionary
+            pep_dict[peptide_sequence]["annotations"] = list(set(pep_dict[peptide_sequence]["annotations"] + annotations))
+        
+        # Collapse the peptide annotations to the protein level
+        pep_fxns = {}
+        # loop through the peptides and add the annotations and spectral counts to the functional annotations dictionary
+        for pep_seq, pep_single_dict in pep_dict.items():
+            for annotation in pep_single_dict["annotations"]:
+                pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
+
+        peptide_annotations = list(set(pep_fxns.keys()))
+
+        # Check that all of the protein annotations are in the peptide annotations and vice versa
+        if not all([x in peptide_annotations for x in protein_annotations]):
+            logger.error(f"Protein annotations: {protein_annotations}")
+            logger.error(f"Peptide annotations: {peptide_annotations}")
+            raise ValueError("Protein and peptide annotations do not match")
+        if not all([x in protein_annotations for x in peptide_annotations]):
+            logger.error(f"Protein annotations: {protein_annotations}")
+            logger.error(f"Peptide annotations: {peptide_annotations}")
+            raise ValueError("Protein and peptide annotations do not match")
+
+
+
+        return fxns
 
     def find_protein_report_url(self, dos):
         """Find the URL for the protein report from a list of data object IDs
@@ -421,6 +493,39 @@ class MetaProtAgg(Aggregator):
         # If no Protein Report data object is found, return None
         return None
 
+    def find_peptide_report_url(self, dos):
+        """Find the URL for the peptide report from a list of data object IDs
+
+        Parameters
+        ----------
+        dos : list
+            List of data object IDs
+
+        Returns
+        -------
+        str
+            URL for the Peptide Report data object if found
+        """
+        url = None
+
+        # Get all the data object records
+        id_filter = '{"id": {"$in": ["' + '","'.join(dos) + '"]}}'
+        do_recs = self.get_results(
+            collection="data_object_set",
+            filter=id_filter,
+            max_page_size=1000,
+            fields="id,data_object_type,url",
+        )
+
+        # Find the Peptide Report data object and return the URL to access it
+        for do in do_recs:
+            if do.get("data_object_type") == "Peptide Report":
+                url = do.get("url")
+                return url
+
+        # If no Peptide Report data object is found, return None
+        return None
+    
     def process_activity(self, act):
         """
         Function to process a metaproteomics workflow record
@@ -438,11 +543,12 @@ class MetaProtAgg(Aggregator):
         """
         # Get the URL and ID
         url = self.find_protein_report_url(act["has_output"])
+        url_pep = self.find_peptide_report_url(act["has_output"])
         if not url:
             raise ValueError(f"Missing url for {act['id']}")
 
         # Parse the KEGG, COG, and PFAM annotations
-        return self.get_functional_terms_from_protein_report(url)
+        return self.get_functional_terms_from_protein_report(url, url_pep)
 
 
 if __name__ == "__main__":
