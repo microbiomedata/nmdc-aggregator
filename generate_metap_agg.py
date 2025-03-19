@@ -41,7 +41,31 @@ class Aggregator(ABC):
         # The following attributes are set in the subclasses
         self.aggregation_filter = ""
         self.workflow_filter = ""
+    
+    @staticmethod
+    def add_to_dict(d, k, v):
+        """Function to add a value to a dictionary key, summing the values if the key already exists
 
+        Parameters
+        ----------
+        d : dict
+            Dictionary to add the key and value to
+        k : str
+            Key to add to the dictionary
+        v : int
+            Value to add to the key in the dictionary
+
+        Returns
+        -------
+        dict
+            Dictionary with the key and value added
+        """
+        if k in d.keys():
+            d[k] += v
+        else:
+            d[k] = v
+        return d
+    
     def get_bearer_token(self):
         """Function to get the bearer token from the API using the /token endpoint
 
@@ -323,73 +347,75 @@ class MetaProtAgg(Aggregator):
         super().__init__()
         self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
-
-    def get_functional_terms_from_protein_report(self, url):
-        """Function to get the functional terms from a URL of a Protein Report
+    
+    def get_functional_terms_from_peptide_report(self, url):
+        """Function to get the functional terms from a URL of a Peptide Report
 
         Parameters
         ----------
         url : str
-            URL to the Protein Report
+            URL to the Peptide Report
 
         Returns
         -------
         dict
-            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the Protein Report
+            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the Peptide Report
         """
-        fxns = {}
+        # Parse the Peptide Report content
+        content_pep = self.read_url_tsv(url)
 
-        content = self.read_url_tsv(url)
+        # Initialize the dictionary to store the peptide annotations for each peptide sequence
+        pep_dict = {}
 
-        # Parse the Protein Report content into KO, COG, and Pfam terms
-        for line in content:
-            # Add ko terms to the dictionary
+        # Loop through the Peptide Report content and populate the dictionary for each peptide sequence
+        for line in content_pep:
+            peptide_sequence = line.get("peptide_sequence")
+            
+            # Add the peptide sequence and spectral count to the dictionary and initialize the annotations list
+            if peptide_sequence not in pep_dict:
+                pep_dict[peptide_sequence] = {}
+                pep_dict[peptide_sequence]["spectral_counts"] = int(float(line.get("peptide_spectral_count")))
+                pep_dict[peptide_sequence]["annotations"] = []
+            
+            # Get the annotations for the peptide sequence
+            annotations = []
+
+            # Add ko terms to annotations list
             ko = line.get("KO")
             if ko != "" and ko is not None:
-                # Replace KO: with KEGG.ORTHOLOGY:
-                ko_clean = ko.replace("KO:", "KEGG.ORTHOLOGY:")
-                if ko_clean not in fxns.keys():
-                    fxns[ko_clean] = int(line.get("SummedSpectraCounts"))
-                else:
-                    fxns[ko_clean] += int(line.get("SummedSpectraCounts"))
+                for ko_term in ko.split(","):
+                    # Replace KO: with KEGG.ORTHOLOGY:
+                    ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
+                    annotations.append(ko_clean)
 
-            # Add cog terms to the dictionary
+            # Add cog terms to annotations list
             cog = line.get("COG")
             if cog != "" and cog is not None:
-                cog_clean = "COG:" + cog
-                if cog_clean not in fxns.keys():
-                    fxns[cog_clean] = int(line.get("SummedSpectraCounts"))
-                else:
-                    fxns[cog_clean] += int(line.get("SummedSpectraCounts"))
+                for cog_term in cog.split(","):
+                    cog_clean = "COG:" + cog_term.strip()
+                    annotations.append(cog_clean)
 
-            # Add pfam terms to the dictionary
+            # Add pfam terms to annotations list
             pfam = line.get("pfam")
             if pfam != "" and pfam is not None:
-                pfam_clean = "PFAM:" + pfam
-                if pfam_clean not in fxns.keys():
-                    fxns[pfam_clean] = int(line.get("SummedSpectraCounts"))
-                else:
-                    fxns[pfam_clean] += int(line.get("SummedSpectraCounts"))
+                for pfam_term in pfam.split(","):
+                    pfam_clean = "PFAM:" + pfam_term.strip()
+                    annotations.append(pfam_clean)
+            
+            # Add the annotations to the peptide sequence dictionary
+            pep_dict[peptide_sequence]["annotations"] = list(set(pep_dict[peptide_sequence]["annotations"] + annotations))
+        
+        # Collapse the peptide annotations to the functional annotation level
+        pep_fxns = {}
+        # loop through the peptides and add the annotations and spectral counts to the functional annotations dictionary
+        for pep_seq, pep_single_dict in pep_dict.items():
+            for annotation in pep_single_dict["annotations"]:
+                pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
 
-        # For all, loop through keys and separate into multiple keys if there are multiple pfams
-        new_fxns = {}
-        for k, v in fxns.items():
-            if "," in k:
-                for pfam in k.split(","):
-                    # Check if pfam is already "PFAM:" prefixed
-                    if not pfam.startswith("PFAM:"):
-                        pfam = "PFAM:" + pfam
-                    if pfam not in new_fxns.keys():
-                        new_fxns[pfam] = v
-                    else:
-                        new_fxns[pfam] += v
-            else:
-                new_fxns[k] = v
+        return pep_fxns
 
-        return new_fxns
-
-    def find_protein_report_url(self, dos):
-        """Find the URL for the protein report from a list of data object IDs
+    def find_peptide_report_url(self, dos):
+        """Find the URL for the peptide report from a list of data object IDs
 
         Parameters
         ----------
@@ -399,7 +425,7 @@ class MetaProtAgg(Aggregator):
         Returns
         -------
         str
-            URL for the Protein Report data object if found
+            URL for the Peptide Report data object if found
         """
         url = None
 
@@ -412,15 +438,15 @@ class MetaProtAgg(Aggregator):
             fields="id,data_object_type,url",
         )
 
-        # Find the Protein Report data object and return the URL to access it
+        # Find the Peptide Report data object and return the URL to access it
         for do in do_recs:
-            if do.get("data_object_type") == "Protein Report":
+            if do.get("data_object_type") == "Peptide Report":
                 url = do.get("url")
                 return url
 
-        # If no Protein Report data object is found, return None
+        # If no Peptide Report data object is found, return None
         return None
-
+    
     def process_activity(self, act):
         """
         Function to process a metaproteomics workflow record
@@ -437,12 +463,12 @@ class MetaProtAgg(Aggregator):
             e.g. {"KEGG.ORTHOLOGY:K00001": 100, "COG:C00001": 50, "PFAM:PF00001": 25}
         """
         # Get the URL and ID
-        url = self.find_protein_report_url(act["has_output"])
+        url = self.find_peptide_report_url(act["has_output"])
         if not url:
             raise ValueError(f"Missing url for {act['id']}")
 
         # Parse the KEGG, COG, and PFAM annotations
-        return self.get_functional_terms_from_protein_report(url)
+        return self.get_functional_terms_from_peptide_report(url)
 
 
 if __name__ == "__main__":
