@@ -37,8 +37,9 @@ Here's how you can run the tests:
 
 1. Run the tests
    ```shell
-   pytest
+   pytest --doctest-modules
    ```
+   > The `--doctest-modules` option tells pytest that we want it to also find and run doctests defined in our modules.
 2. See the test results in the console
 
 ## Deployment
