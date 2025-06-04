@@ -13,7 +13,7 @@ def make_functional_annotation_agg_member(
     count: int,
 ) -> dict:
     r"""
-    Returns a dictionary representing a instance of the `FunctionalAnnotationAggMember`
+    Returns a dictionary representing an instance of the `FunctionalAnnotationAggMember`
     class defined in the NMDC Schema (as of `nmdc-version` version `11.7.0`).
     Docs: https://microbiomedata.github.io/nmdc-schema/FunctionalAnnotationAggMember/
 
