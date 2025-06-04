@@ -7,6 +7,27 @@ from signal import signal, SIGINT
 stop = False
 
 
+def make_functional_annotation_agg_member(
+    was_generated_by: str,
+    gene_function_id: str,
+    count: int,
+) -> dict:
+    r"""
+    Returns a dictionary representing an instance of the `FunctionalAnnotationAggMember`
+    class defined in the NMDC Schema (as of `nmdc-version` version `11.7.0`).
+    Docs: https://microbiomedata.github.io/nmdc-schema/FunctionalAnnotationAggMember/
+
+    >>> make_functional_annotation_agg_member("wgb", "gfi", 123)
+    {'was_generated_by': 'wgb', 'gene_function_id': 'gfi', 'count': 123, 'type': 'nmdc:FunctionalAnnotationAggMember'}
+    """
+    return {
+        "was_generated_by": was_generated_by,
+        "gene_function_id": gene_function_id,
+        "count": count,
+        "type": "nmdc:FunctionalAnnotationAggMember",
+    }
+
+
 def sig_handler(signalnumber, frame):
     global stop
     stop = True
@@ -118,11 +139,11 @@ class MetaGenomeFuncAgg():
 
         rows = []
         for func, ct in cts.items():
-            rec = {
-                'was_generated_by': id,
-                'gene_function_id': func,
-                'count': ct
-                }
+            rec = make_functional_annotation_agg_member(
+                was_generated_by=id,
+                gene_function_id=func,
+                count=ct,
+            )
             rows.append(rec)
         print(f' - {len(rows)} terms')
         return rows
