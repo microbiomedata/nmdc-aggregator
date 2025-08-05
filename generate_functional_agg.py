@@ -50,8 +50,8 @@ class AnnotationLine():
 
         for anno in annotations:
             if anno.startswith("ko="):
-                kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
-                self.kegg = [ko.strip() for ko in kos.split(',')]
+                processed_kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
+                self.kegg = [ko.strip() for ko in processed_kos.split(',')]
             elif anno.startswith("cog="):
                 self.cogs = ['COG:' + cog_id.strip() for cog_id in anno[4:].split(',')]
             elif anno.startswith("product="):
