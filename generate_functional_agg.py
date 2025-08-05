@@ -43,24 +43,23 @@ class AnnotationLine():
         self.ec_numbers = None
         self.pfams = None
 
-        if line.find("ko=") > 0:
-            annotations = line.split("\t")[8].split(";")
-            self.id = annotations[0][3:]
-            if filter and self.id not in filter:
-                return
+        annotations = line.split("\t")[8].split(";")
+        self.id = annotations[0][3:]
+        if filter and self.id not in filter:
+            return
 
-            for anno in annotations:
-                if anno.startswith("ko="):
-                    kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
-                    self.kegg = kos.rstrip().split(',')
-                elif anno.startswith("cog="):
-                    self.cogs = ['COG:' + cog_id for cog_id in anno[4:].split(',')]
-                elif anno.startswith("product="):
-                    self.product = anno[8:]
-                elif anno.startswith("ec_number="):
-                    self.ec_numbers = anno[10:].split(",")
-                elif anno.startswith("pfam="):
-                    self.pfams = ['PFAM:' + pfam_id for pfam_id in anno[5:].split(",")]
+        for anno in annotations:
+            if anno.startswith("ko="):
+                kos = anno[3:].replace("KO:", "KEGG.ORTHOLOGY:")
+                self.kegg = [ko.strip() for ko in kos.split(',')]
+            elif anno.startswith("cog="):
+                self.cogs = ['COG:' + cog_id.strip() for cog_id in anno[4:].split(',')]
+            elif anno.startswith("product="):
+                self.product = anno[8:]
+            elif anno.startswith("ec_number="):
+                self.ec_numbers = anno[10:].split(",")
+            elif anno.startswith("pfam="):
+                self.pfams = ['PFAM:' + pfam_id.strip() for pfam_id in anno[5:].split(",")]
 
 
 class MetaGenomeFuncAgg():
