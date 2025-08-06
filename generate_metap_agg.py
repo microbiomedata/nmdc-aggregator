@@ -473,4 +473,34 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp = MetaProtAgg()
+    mp_wf_recs = mp.get_workflow_records()
+    json_records=[]
+    for rec in mp_wf_recs:
+        if rec["id"] in  ["nmdc:wfmp-11-fz8k5p27.1", "nmdc:wfmp-11-x0zhd078.1"]:
+            functional_agg_dict = mp.process_activity(rec)
+            for k, v in functional_agg_dict.items():
+                            json_records.append(
+                                {
+                                    "was_generated_by": rec["id"],
+                                    "gene_function_id": k,
+                                    "count": v,
+                                    "type": "nmdc:FunctionalAnnotationAggMember",
+                                }
+                            )
+            baddies = [x for x in json_records if "PFAM:COG" in x["gene_function_id"]]
+            assert len(baddies) == 0, f"Found {len(baddies)} records with 'PFAM:COG' in gene_function_id"
+
     mp.sweep()
+
+"""
+https://github.com/microbiomedata/issues/issues/1300
+    {
+  "_id": {
+    "$oid": "6760ed5af91a18ce5e6aec0b"
+  },
+  "was_generated_by": "nmdc:wfmp-11-fz8k5p27.1",
+  "gene_function_id": "PFAM:COG2080", #Should be "COG:COG2080"
+  "count": 3,
+  "type": "nmdc:FunctionalAnnotationAggMember"
+}
+"""
