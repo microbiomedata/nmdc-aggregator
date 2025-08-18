@@ -2,7 +2,7 @@ import os
 import requests
 from pymongo import MongoClient
 from signal import signal, SIGINT
-
+from aggregator import Aggregator
 
 stop = False
 
@@ -62,13 +62,20 @@ class AnnotationLine():
                 self.pfams = ['PFAM:' + pfam_id.strip() for pfam_id in anno[5:].split(",")]
 
 
-class MetaGenomeFuncAgg():
+class MetaGenomeFuncAgg(Aggregator):
     _BASE_URL_ENV = "NMDC_BASE_URL"
     _base_url = "https://data.microbiomedata.org/data"
     _BASE_PATH_ENV = "NMDC_BASE_PATH"
     _base_dir = "/global/cfs/cdirs/m3408/results"
 
     def __init__(self):
+        self.base_url = os.getenv("NMDC_API_URL") or self._NMDC_API_URL
+        self.get_bearer_token()
+
+        # The following attributes are set in the subclasses
+        self.aggregation_filter = ""
+        self.workflow_filter = ""
+
         url = os.environ["MONGO_URL"]
         client = MongoClient(url, directConnection=True)
         self.db = client.nmdc
@@ -111,25 +118,36 @@ class MetaGenomeFuncAgg():
                     func_count[pfam] += 1
         return func_count
 
-    def find_anno(self, dos):
+    def find_gff_annotation_url(self, data_object_ids:list[str]) -> str:
         """
         Find the GFF annotation URL
-        input: list of data object IDs
-        returns: GFF functional annotation URL
+
+        Parameters
+        ----------
+        data_object_ids : list[str]
+            List of data object IDs
+
+        Returns
+        -------
+        str
+            GFF functional annotation URL
         """
-        url = None
-        for doid in dos:
-            do = self.do_col.find_one({"id": doid})
-            # skip over bad records
-            if not do or 'data_object_type' not in do:
-                continue
-            if do['data_object_type'] == 'Functional Annotation GFF':
-                url = do['url']
-                break
-        return url
+        id_filter = '{"id": {"$in": ["' + '","'.join(data_object_ids) + '"]}}'
+        do_recs = self.get_results(
+            collection="data_object_set",
+            filter=id_filter,
+            max_page_size=1000,
+            fields="id,data_object_type,url",
+        )
+        for do in do_recs:
+            if do.get('data_object_type') == 'Functional Annotation GFF':
+                return do.get("url")
+            
+        # if no GFF is found, return None
+        return None
 
     def process_workflow_execution(self, execution_record):
-        url = self.find_anno(execution_record['has_output'])
+        url = self.find_gff_annotation_url(execution_record['has_output'])
         if not url:
             raise ValueError("Missing url")
         print(f"{execution_record['id']}: {url}")
