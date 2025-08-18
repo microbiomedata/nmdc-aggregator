@@ -14,7 +14,7 @@ def make_functional_annotation_agg_member(
 ) -> dict:
     r"""
     Returns a dictionary representing an instance of the `FunctionalAnnotationAggMember`
-    class defined in the NMDC Schema (as of `nmdc-version` version `11.7.0`).
+    class defined in the NMDC Schema (as of `nmdc-version` version `11.10.0`).
     Docs: https://microbiomedata.github.io/nmdc-schema/FunctionalAnnotationAggMember/
 
     >>> make_functional_annotation_agg_member("wgb", "gfi", 123)
@@ -146,59 +146,71 @@ class MetaGenomeFuncAgg(Aggregator):
         # if no GFF is found, return None
         return None
 
-    def process_workflow_execution(self, execution_record):
-        url = self.find_gff_annotation_url(execution_record['has_output'])
+    def get_functional_terms_from_gff_report(self, url):
+        """Function to get the functional terms from a URL of GFF
+
+        Parameters
+        ----------
+        url : str
+            URL to the GFF Report
+
+        Returns
+        -------
+        dict
+            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the GFF Report
+        """
+        # Download the GFF file
+        gff_data = requests.get(url).text
+
+        # Parse the GFF file
+        functional_terms = {
+            "KEGG": {},
+            "COG": {},
+            "PFAM": {}
+        }
+        for line in gff_data.splitlines():
+            if line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            if len(fields) < 9:
+                continue
+            feature = fields[2]
+            attributes = fields[8]
+            if feature == "gene":
+                for term in attributes.split(";"):
+                    if term.startswith("KEGG"):
+                        functional_terms["KEGG"][term] = functional_terms["KEGG"].get(term, 0) + 1
+                    elif term.startswith("COG"):
+                        functional_terms["COG"][term] = functional_terms["COG"].get(term, 0) + 1
+                    elif term.startswith("PFAM"):
+                        functional_terms["PFAM"][term] = functional_terms["PFAM"].get(term, 0) + 1
+        return functional_terms
+    
+    def process_activity(self, act):
+        """
+        Function to process a metagenome workflow record
+
+        Parameters
+        ----------
+        act : dict
+            Metagenome workflow record to process
+
+        Output
+        ------
+        dict
+            Dictionary of functional annotations with their respective spectral counts
+            e.g. {"KEGG.ORTHOLOGY:K00001": 100, "COG:C00001": 50, "PFAM:PF00001": 25}
+        """
+        # Get the URL and ID
+        url = self.find_gff_annotation_url(act["has_output"])
         if not url:
-            raise ValueError("Missing url")
-        print(f"{execution_record['id']}: {url}")
-        id = execution_record['id']
-        cts = self.get_functional_annotation_counts(url)
+            raise ValueError(f"Missing url for {act['id']}")
 
-        rows = []
-        for func, ct in cts.items():
-            rec = make_functional_annotation_agg_member(
-                was_generated_by=id,
-                gene_function_id=func,
-                count=ct,
-            )
-            rows.append(rec)
-        print(f' - {len(rows)} terms')
-        return rows
-
-    def sweep(self):
-        print("Getting list of indexed objects")
-        done = self.agg_col.distinct("was_generated_by")
-        q = {"type": {
-            "$in": ["nmdc:MetagenomeAnnotation", "nmdc:MetatranscriptomeAnnotation"]
-        }}
-        execution_records = self.db.workflow_execution_set.find(q)
-        for execution_record in execution_records:
-            if execution_record['id'] in done:
-                continue
-            try:
-                rows = self.process_workflow_execution(execution_record)
-            except Exception as ex:
-                # Continue on errors
-                print(ex)
-                continue
-            if len(rows) > 0:
-                print(' - %s' % (str(rows[0])))
-                self.agg_col.insert_many(rows)
-            else:
-                print(f' - No rows for {execution_record["id"]}')
-            if stop:
-                print("quiting")
-                break
+        # Parse the KEGG, COG, and PFAM annotations
+        return self.get_functional_terms_from_peptide_report(url)
 
 
 if __name__ == "__main__":
     signal(SIGINT, sig_handler)
     mg = MetaGenomeFuncAgg()
     mg.sweep()
-
-
-# Schema
-#
-#        was_generated_by        |   gene_function_id    | count
-# ---------------------------------------+-----------------------+-------
-#  nmdc:006424afe19af3c36c50e2b2e68b9510 | KEGG.ORTHOLOGY:K00001 |   145
