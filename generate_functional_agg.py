@@ -1,39 +1,12 @@
 import os
 import requests
-from pymongo import MongoClient
-from signal import signal, SIGINT
 from aggregator import Aggregator
 
-stop = False
-
-
-def make_functional_annotation_agg_member(
-    was_generated_by: str,
-    gene_function_id: str,
-    count: int,
-) -> dict:
-    r"""
-    Returns a dictionary representing an instance of the `FunctionalAnnotationAggMember`
-    class defined in the NMDC Schema (as of `nmdc-version` version `11.10.0`).
-    Docs: https://microbiomedata.github.io/nmdc-schema/FunctionalAnnotationAggMember/
-
-    >>> make_functional_annotation_agg_member("wgb", "gfi", 123)
-    {'was_generated_by': 'wgb', 'gene_function_id': 'gfi', 'count': 123, 'type': 'nmdc:FunctionalAnnotationAggMember'}
-    """
-    return {
-        "was_generated_by": was_generated_by,
-        "gene_function_id": gene_function_id,
-        "count": count,
-        "type": "nmdc:FunctionalAnnotationAggMember",
-    }
-
-
-def sig_handler(signalnumber, frame):
-    global stop
-    stop = True
-
-
 class AnnotationLine():
+    """
+    Class to represent a line of functional annotation from a GFF report. 
+    The GFF reports are not always well-structured, and this class aims to extract relevant information from them.
+    """
 
     def __init__(self, line, filter=None):
         self.id = None
@@ -63,38 +36,40 @@ class AnnotationLine():
 
 
 class MetaGenomeFuncAgg(Aggregator):
-    _BASE_URL_ENV = "NMDC_BASE_URL"
-    _base_url = "https://data.microbiomedata.org/data"
-    _BASE_PATH_ENV = "NMDC_BASE_PATH"
-    _base_dir = "/global/cfs/cdirs/m3408/results"
+    """
+    Metagenome Aggregator class
+
+    Notes
+    -----
+    This class is used to aggregate functional annotations from metagenomics workflows in the NMDC database.
+    """
 
     def __init__(self):
-        self.base_url = os.getenv("NMDC_API_URL") or self._NMDC_API_URL
-        self.get_bearer_token()
+        super().__init__()
+        self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmgan"}}'
+        self.workflow_filter = '{"type":"nmdc:MetagenomeAnnotation"}'
 
-        # The following attributes are set in the subclasses
-        self.aggregation_filter = ""
-        self.workflow_filter = ""
+    def get_functional_annotation_counts_from_gff_report(self, url:str) -> dict:
+        """
+        Function to get functional annotation counts from the URL of a GFF report.
+        Utilizes the AnnotationLine class to parse the GFF report and extract functional annotations.
 
-        url = os.environ["MONGO_URL"]
-        client = MongoClient(url, directConnection=True)
-        self.db = client.nmdc
-        self.agg_col = self.db.functional_annotation_agg
-        self.do_col = self.db.data_object_set
-        self.base_url = os.environ.get(self._BASE_URL_ENV, self._base_url)
-        self.base_dir = os.environ.get(self._BASE_PATH_ENV, self._base_dir)
+        Parameters
+        ----------
+        url : str
+            URL to the GFF Report
 
-    def get_functional_annotation_counts(self, url):
-        fn = url.replace(self.base_url, self.base_dir)
+        Returns
+        -------
+        dict
+            Dictionary of KEGG, COG, and PFAM terms with their respective counts derived from the GFF Report
+        """
 
-        if os.path.exists(fn):
-            lines = open(fn)
-        else:
-            s = requests.Session()
-            resp = s.get(url, headers=None, stream=True)
-            if not resp.ok:
-                raise OSError(f"Failed to read {url}")
-            lines = resp.iter_lines()
+        s = requests.Session()
+        resp = s.get(url, headers=None, stream=True)
+        if not resp.ok:
+            raise OSError(f"Failed to read {url}")
+        lines = resp.iter_lines()
 
         func_count = {}
         for line in lines:
@@ -145,46 +120,6 @@ class MetaGenomeFuncAgg(Aggregator):
             
         # if no GFF is found, return None
         return None
-
-    def get_functional_terms_from_gff_report(self, url):
-        """Function to get the functional terms from a URL of GFF
-
-        Parameters
-        ----------
-        url : str
-            URL to the GFF Report
-
-        Returns
-        -------
-        dict
-            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the GFF Report
-        """
-        # Download the GFF file
-        gff_data = requests.get(url).text
-
-        # Parse the GFF file
-        functional_terms = {
-            "KEGG": {},
-            "COG": {},
-            "PFAM": {}
-        }
-        for line in gff_data.splitlines():
-            if line.startswith("#"):
-                continue
-            fields = line.split("\t")
-            if len(fields) < 9:
-                continue
-            feature = fields[2]
-            attributes = fields[8]
-            if feature == "gene":
-                for term in attributes.split(";"):
-                    if term.startswith("KEGG"):
-                        functional_terms["KEGG"][term] = functional_terms["KEGG"].get(term, 0) + 1
-                    elif term.startswith("COG"):
-                        functional_terms["COG"][term] = functional_terms["COG"].get(term, 0) + 1
-                    elif term.startswith("PFAM"):
-                        functional_terms["PFAM"][term] = functional_terms["PFAM"].get(term, 0) + 1
-        return functional_terms
     
     def process_activity(self, act):
         """
@@ -207,10 +142,10 @@ class MetaGenomeFuncAgg(Aggregator):
             raise ValueError(f"Missing url for {act['id']}")
 
         # Parse the KEGG, COG, and PFAM annotations
-        return self.get_functional_terms_from_peptide_report(url)
+        return self.get_functional_annotation_counts_from_gff_report(url)
 
 
 if __name__ == "__main__":
-    signal(SIGINT, sig_handler)
     mg = MetaGenomeFuncAgg()
     mg.sweep()
+    
