@@ -14,6 +14,11 @@ class Aggregator(ABC):
     """
     Abstract class for Aggregators
 
+    Parameters
+    ----------
+    dev : bool
+        Flag to indicate if production or development API should be used
+        Default is True, which uses the development API
 
     Attributes
     ----------
@@ -31,11 +36,10 @@ class Aggregator(ABC):
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
     """
 
-    # Set the base URL for the API
-    _NMDC_API_URL = "https://api-dev.microbiomedata.org"
 
-    def __init__(self):
-        self.base_url = os.getenv("NMDC_API_URL") or self._NMDC_API_URL
+    def __init__(self, dev:bool=True):
+        self.base_url = "https://api-dev.microbiomedata.org" if dev else "https://api.microbiomedata.org"
+
         self.get_bearer_token()
 
         # The following attributes are set in the subclasses

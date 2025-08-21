@@ -15,8 +15,8 @@ class MetaProtAgg(Aggregator):
     This class is used to aggregate functional annotations from metaproteomics workflows in the NMDC database.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, dev:bool=True):
+        super().__init__(dev=dev)
         self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
         self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
     
