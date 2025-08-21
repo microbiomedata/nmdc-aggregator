@@ -1,5 +1,5 @@
-from generate_functional_agg import AnnotationLine
-from generate_functional_agg import MetaGenomeFuncAgg
+from generate_metag_functional_agg import AnnotationLine
+from generate_metag_functional_agg import MetaGenomeFuncAgg
 
 
 def test_AnnotationLine():
