@@ -5,6 +5,9 @@ import os
 from abc import ABC, abstractmethod
 import logging
 import warnings
+import json
+import sys
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -189,31 +192,57 @@ class Aggregator(ABC):
         )
         return act_col
 
-    def submit_json_records(self, json_records):
+    def submit_json_records(self, json_records, size_limit:int=25):
         """Function to submit records to the database using the post /metadata/json:submit endpoint
 
         Parameters
         ----------
         json_records : list
             List of dictionaries where each dictionary represents a record to be submitted to the database
+        size_limit : int
+            Maximum size limit for the submission in MB. Default is 25 MB.
 
         Returns
         -------
         int
             HTTP status code of the response
         """
-        # TODO check size of submission, split if needed right now limit is "25 mb"
-        # size limit should be a parameter
-        # just a list, can split it up in a loop if needed, make sure everyone has 200
-        url = f"{self.base_url}/metadata/json:submit"
+        # Check size of submission, split if needed.
+        def batch_records(records, max_size_mb=size_limit):
+            record_size = sys.getsizeof(records) / (1024 * 1024)  # size in MB
+            # if the size is within the limit, submit as is.
+            if record_size <= max_size_mb:
+                return [records]
+            batches = []
+            current_batch = []
+            current_size = 0
+            for record in records:
+                if (current_size + record_size > max_size_mb):
+                    batches.append(current_batch)
+                    current_batch = []
+                    current_size = 0
+                current_batch.append(record)
+                current_size += record_size
+            if current_batch:
+                batches.append(current_batch)
+            return batches
 
+        record_batch = batch_records(json_records)
+        url = f"{self.base_url}/metadata/json:submit"
         headers = {
             "accept": "application/json",
             "Authorization": f"Bearer {self.nmdc_api_token}",
             "Content-Type": "application/json",
         }
-
-        response = requests.post(url, headers=headers, json=json_records)
+        
+        for batch in record_batch:
+            response = requests.post(url, headers=headers, json=batch)
+            if response.status_code != 200:
+                logger.error(f"Error submitting batch: {response.status_code}, {response.text}")
+                logger.error(f"Saving failed batch to `failed_submission_batches.txt`: {batch}")
+                with open("failed_submission_batches.txt", "a") as f:
+                    f.write(f"Called from subclass: {self.__class__.__name__}\n")
+                    f.write(f"{datetime.now().isoformat()} - {json.dumps(batch)}\n")
 
         return response.status_code
 
