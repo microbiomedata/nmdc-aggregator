@@ -39,19 +39,13 @@ class MetaGenomeFuncAgg(Aggregator):
     """
     Metagenome Aggregator class
 
-    Parameters
-    ----------
-    dev : bool
-        Flag to indicate if production or development API should be used
-        Default is True, which uses the development API
-
     Notes
     -----
     This class is used to aggregate functional annotations from metagenomics workflows in the NMDC database.
     """
 
-    def __init__(self, dev:bool=True):
-        super().__init__(dev=dev)
+    def __init__(self):
+        super().__init__()
         self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmgan"}}'
         self.workflow_filter = '{"type":"nmdc:MetagenomeAnnotation"}'
 

@@ -65,6 +65,7 @@ Now that the container image is hosted there, you can configure a Spin workload 
 - `POLL_TIME`: Number of seconds to sleep between each run (Default: `14400`, which is 4 hours)
 - `NMDC_CLIENT_ID`: Client ID for interacting with NMDC's runtime API
 - `NMDC_CLIENT_PW`: Password for interacting with NMDC's runtime API
+- `ENV`: Whether to run the scripts in the production or development runtime environment. Options are "prod" or "dev".
 
 ## Release Notes
 

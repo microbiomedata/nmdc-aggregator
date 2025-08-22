@@ -4,6 +4,7 @@ import io
 import os
 from abc import ABC, abstractmethod
 import logging
+import warnings
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -13,12 +14,6 @@ logger = logging.getLogger(__name__)
 class Aggregator(ABC):
     """
     Abstract class for Aggregators
-
-    Parameters
-    ----------
-    dev : bool
-        Flag to indicate if production or development API should be used
-        Default is True, which uses the development API
 
     Attributes
     ----------
@@ -37,11 +32,21 @@ class Aggregator(ABC):
     """
 
 
-    def __init__(self, dev:bool=True):
-        self.base_url = "https://api-dev.microbiomedata.org" if dev else "https://api.microbiomedata.org"
-
+    def __init__(self):
+        # if no env is passed in, default to dev
+        if not os.getenv("ENV", None):
+            self.base_url = "https://api-dev.microbiomedata.org"
+        # if it is passed in, do some checks
+        else:
+            if os.getenv("ENV") not in ["dev", "prod"]:
+                warnings.warn(f"Invalid ENV value: {os.getenv('ENV')}. Should be one of [dev, prod]. Defaulting to dev.")
+                self.base_url = "https://api-dev.microbiomedata.org"
+            if os.getenv("ENV") == "dev":
+                self.base_url = "https://api-dev.microbiomedata.org"
+            elif os.getenv("ENV") == "prod":
+                self.base_url = "https://api.microbiomedata.org"
+        
         self.get_bearer_token()
-
         # The following attributes are set in the subclasses
         self.aggregation_filter = ""
         self.workflow_filter = ""
@@ -197,6 +202,9 @@ class Aggregator(ABC):
         int
             HTTP status code of the response
         """
+        # TODO check size of submission, split if needed right now limit is "25 mb"
+        # size limit should be a parameter
+        # just a list, can split it up in a loop if needed, make sure everyone has 200
         url = f"{self.base_url}/metadata/json:submit"
 
         headers = {
