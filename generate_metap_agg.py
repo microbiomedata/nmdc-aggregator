@@ -413,7 +413,7 @@ class MetaProtAgg(Aggregator):
             for annotation in pep_single_dict["annotations"]:
                 pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
 
-        # Check that all annotations adhere to their respective formats
+        # Check that all annotations adhere to the expected format for annotations
         for annotation in pep_fxns.keys():
             if not re.search(r"(COG:COG\d+|PFAM:PF\d{5}|KEGG.ORTHOLOGY:K\d+)", annotation):
                 raise ValueError(f"Bad annotation formed: {annotation}")
