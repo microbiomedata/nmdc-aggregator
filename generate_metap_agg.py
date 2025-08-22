@@ -1,3 +1,4 @@
+import re
 import requests
 import csv
 import io
@@ -382,7 +383,7 @@ class MetaProtAgg(Aggregator):
 
             # Add ko terms to annotations list
             ko = line.get("KO")
-            if ko != "" and ko is not None:
+            if ko.startswith("KO:"):
                 for ko_term in ko.split(","):
                     # Replace KO: with KEGG.ORTHOLOGY:
                     ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
@@ -390,18 +391,18 @@ class MetaProtAgg(Aggregator):
 
             # Add cog terms to annotations list
             cog = line.get("COG")
-            if cog != "" and cog is not None:
+            if cog.startswith("COG:"):
                 for cog_term in cog.split(","):
                     cog_clean = "COG:" + cog_term.strip()
                     annotations.append(cog_clean)
 
             # Add pfam terms to annotations list
             pfam = line.get("pfam")
-            if pfam != "" and pfam is not None:
+            if pfam.startswith("PF"):
                 for pfam_term in pfam.split(","):
                     pfam_clean = "PFAM:" + pfam_term.strip()
                     annotations.append(pfam_clean)
-            
+
             # Add the annotations to the peptide sequence dictionary
             pep_dict[peptide_sequence]["annotations"] = list(set(pep_dict[peptide_sequence]["annotations"] + annotations))
         
@@ -411,6 +412,11 @@ class MetaProtAgg(Aggregator):
         for pep_seq, pep_single_dict in pep_dict.items():
             for annotation in pep_single_dict["annotations"]:
                 pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
+
+        # Check that all annotations adhere to their respective formats
+        for annotation in pep_fxns.keys():
+            if not re.search(r"(COG:COG\d+|PFAM:PF\d{5}|KEGG.ORTHOLOGY:K\d+)", annotation):
+                raise ValueError(f"Bad annotation formed: {annotation}")
 
         return pep_fxns
 
@@ -473,34 +479,4 @@ class MetaProtAgg(Aggregator):
 
 if __name__ == "__main__":
     mp = MetaProtAgg()
-    mp_wf_recs = mp.get_workflow_records()
-    json_records=[]
-    for rec in mp_wf_recs:
-        if rec["id"] in  ["nmdc:wfmp-11-fz8k5p27.1", "nmdc:wfmp-11-x0zhd078.1"]:
-            functional_agg_dict = mp.process_activity(rec)
-            for k, v in functional_agg_dict.items():
-                            json_records.append(
-                                {
-                                    "was_generated_by": rec["id"],
-                                    "gene_function_id": k,
-                                    "count": v,
-                                    "type": "nmdc:FunctionalAnnotationAggMember",
-                                }
-                            )
-            baddies = [x for x in json_records if "PFAM:COG" in x["gene_function_id"]]
-            assert len(baddies) == 0, f"Found {len(baddies)} records with 'PFAM:COG' in gene_function_id"
-
     mp.sweep()
-
-"""
-https://github.com/microbiomedata/issues/issues/1300
-    {
-  "_id": {
-    "$oid": "6760ed5af91a18ce5e6aec0b"
-  },
-  "was_generated_by": "nmdc:wfmp-11-fz8k5p27.1",
-  "gene_function_id": "PFAM:COG2080", #Should be "COG:COG2080"
-  "count": 3,
-  "type": "nmdc:FunctionalAnnotationAggMember"
-}
-"""
