@@ -383,7 +383,7 @@ class MetaProtAgg(Aggregator):
 
             # Add ko terms to annotations list
             ko = line.get("KO")
-            if ko.startswith("KO:"):
+            if ko.startswith("KO"):
                 for ko_term in ko.split(","):
                     # Replace KO: with KEGG.ORTHOLOGY:
                     ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
@@ -391,7 +391,7 @@ class MetaProtAgg(Aggregator):
 
             # Add cog terms to annotations list
             cog = line.get("COG")
-            if cog.startswith("COG:"):
+            if cog.startswith("COG"):
                 for cog_term in cog.split(","):
                     cog_clean = "COG:" + cog_term.strip()
                     annotations.append(cog_clean)
