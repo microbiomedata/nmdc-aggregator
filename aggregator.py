@@ -8,6 +8,8 @@ import warnings
 import json
 import sys
 from datetime import datetime
+import random
+import string
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -213,19 +215,12 @@ class Aggregator(ABC):
             # if the size is within the limit, submit as is.
             if record_size <= max_size_mb:
                 return [records]
-            batches = []
-            current_batch = []
-            current_size = 0
-            for record in records:
-                if (current_size + record_size > max_size_mb):
-                    batches.append(current_batch)
-                    current_batch = []
-                    current_size = 0
-                current_batch.append(record)
-                current_size += record_size
-            if current_batch:
-                batches.append(current_batch)
-            return batches
+            # split in half and see if the first half is within the size limit
+            mid = len(records) // 2
+            if sys.getsizeof(records[:mid]) / (1024 * 1024) <= max_size_mb:
+                return [records[:mid]] + batch_records(records[mid:], max_size_mb)
+            # if the first half is too large, recursively batch both halves
+            return batch_records(records[:mid], max_size_mb) + batch_records(records[mid:], max_size_mb)
 
         record_batch = batch_records(json_records)
         url = f"{self.base_url}/metadata/json:submit"
