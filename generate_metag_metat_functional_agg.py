@@ -41,7 +41,7 @@ class MetaGMetaTFuncAgg(Aggregator):
 
     Notes
     -----
-    This class is used to aggregate functional annotations from metagenomics workflows in the NMDC database.
+    This class is used to aggregate functional annotations from metagenomics and metatranscriptomics workflows in the NMDC database.
     """
 
     def __init__(self):
@@ -123,12 +123,12 @@ class MetaGMetaTFuncAgg(Aggregator):
     
     def process_activity(self, act):
         """
-        Function to process a metagenome workflow record
+        Function to process a metagenomics or metatranscriptomics annotation workflow record
 
         Parameters
         ----------
         act : dict
-            Metagenome workflow record to process
+            Metagenome or Metatranscriptome Annotation workflow record to process
 
         Output
         ------
