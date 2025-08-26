@@ -17,7 +17,7 @@ def test_functional_annotation_counts(monkeypatch):
     monkeypatch.setenv("MONGO_URL", "mongodb://db")
     mp = MetaGMetaTFuncAgg()
     url = "https://portal.nersc.gov/cfs/m3408/test_data/metaT/functional_annotation.gff"
-    terms = mp.get_functional_annotation_counts(url)
+    terms = mp.get_functional_annotation_counts_from_gff_report(url)
     assert len(terms) == 1965
     assert terms["KEGG.ORTHOLOGY:K00031"] == 1
     assert terms["COG:COG0004"] == 3
