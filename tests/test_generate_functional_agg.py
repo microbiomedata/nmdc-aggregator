@@ -1,5 +1,5 @@
-from generate_metag_metaat_functional_agg import AnnotationLine
-from generate_metag_metaat_functional_agg import MetaGMetaTFuncAgg
+from generate_metag_metat_functional_agg import AnnotationLine
+from generate_metag_metat_functional_agg import MetaGMetaTFuncAgg
 
 
 def test_AnnotationLine():
