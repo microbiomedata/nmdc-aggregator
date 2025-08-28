@@ -14,7 +14,6 @@ def test_AnnotationLine():
 
 
 def test_functional_annotation_counts(monkeypatch):
-    monkeypatch.setenv("MONGO_URL", "mongodb://db")
     mp = MetaGMetaTFuncAgg()
     url = "https://portal.nersc.gov/cfs/m3408/test_data/metaT/functional_annotation.gff"
     terms = mp.get_functional_annotation_counts_from_gff_report(url)
