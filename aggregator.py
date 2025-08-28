@@ -1,10 +1,13 @@
-import re
 import requests
 import csv
 import io
 import os
 from abc import ABC, abstractmethod
 import logging
+import warnings
+import json
+import sys
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
@@ -14,7 +17,6 @@ logger = logging.getLogger(__name__)
 class Aggregator(ABC):
     """
     Abstract class for Aggregators
-
 
     Attributes
     ----------
@@ -32,13 +34,22 @@ class Aggregator(ABC):
         e.g. '{"type":"nmdc:MetaproteomicsAnalysis"}'
     """
 
-    # Set the base URL for the API
-    _NMDC_API_URL = "https://api-dev.microbiomedata.org"
 
     def __init__(self):
-        self.base_url = os.getenv("NMDC_API_URL") or self._NMDC_API_URL
+        # if no env is passed in, default to dev
+        if not os.getenv("ENV", None):
+            self.base_url = "https://api-dev.microbiomedata.org"
+        # if it is passed in, do some checks
+        else:
+            if os.getenv("ENV") not in ["dev", "prod"]:
+                warnings.warn(f"Invalid ENV value: {os.getenv('ENV')}. Should be one of [dev, prod]. Defaulting to dev.")
+                self.base_url = "https://api-dev.microbiomedata.org"
+            if os.getenv("ENV") == "dev":
+                self.base_url = "https://api-dev.microbiomedata.org"
+            elif os.getenv("ENV") == "prod":
+                self.base_url = "https://api.microbiomedata.org"
+        
         self.get_bearer_token()
-
         # The following attributes are set in the subclasses
         self.aggregation_filter = ""
         self.workflow_filter = ""
@@ -181,28 +192,50 @@ class Aggregator(ABC):
         )
         return act_col
 
-    def submit_json_records(self, json_records):
+    def submit_json_records(self, json_records, size_limit:int=25):
         """Function to submit records to the database using the post /metadata/json:submit endpoint
 
         Parameters
         ----------
         json_records : list
             List of dictionaries where each dictionary represents a record to be submitted to the database
+        size_limit : int
+            Maximum size limit for the submission in MB. Default is 25 MB.
 
         Returns
         -------
         int
             HTTP status code of the response
         """
-        url = f"{self.base_url}/metadata/json:submit"
+        # Check size of submission, split if needed.
+        def batch_records(records, max_size_mb=size_limit):
+            record_size = sys.getsizeof(records) / (1024 * 1024)  # size in MB
+            # if the size is within the limit, submit as is.
+            if record_size <= max_size_mb:
+                return [records]
+            # split in half and see if the first half is within the size limit
+            mid = len(records) // 2
+            if sys.getsizeof(records[:mid]) / (1024 * 1024) <= max_size_mb:
+                return [records[:mid]] + batch_records(records[mid:], max_size_mb)
+            # if the first half is too large, recursively batch both halves
+            return batch_records(records[:mid], max_size_mb) + batch_records(records[mid:], max_size_mb)
 
+        record_batch = batch_records(json_records)
+        url = f"{self.base_url}/metadata/json:submit"
         headers = {
             "accept": "application/json",
             "Authorization": f"Bearer {self.nmdc_api_token}",
             "Content-Type": "application/json",
         }
-
-        response = requests.post(url, headers=headers, json=json_records)
+        
+        for batch in record_batch:
+            response = requests.post(url, headers=headers, json=batch)
+            if response.status_code != 200:
+                logger.error(f"Error submitting batch: {response.status_code}, {response.text}")
+                logger.error(f"Saving failed batch to `failed_submission_batches.txt`: {batch}")
+                with open("failed_submission_batches.txt", "a") as f:
+                    f.write(f"Called from subclass: {self.__class__.__name__}\n")
+                    f.write(f"{datetime.now().isoformat()} - {json.dumps(batch)}\n")
 
         return response.status_code
 
@@ -327,156 +360,3 @@ class Aggregator(ABC):
             Dictionary of functional annotations with their respective counts
         """
         pass
-
-
-class MetaProtAgg(Aggregator):
-    """
-    Metaproteomics Aggregator class
-
-    Parameters
-    ----------
-    dev : bool
-        Flag to indicate if production or development API should be used
-        Default is True, which uses the development API
-
-    Notes
-    -----
-    This class is used to aggregate functional annotations from metaproteomics workflows in the NMDC database.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.aggregation_filter = '{"was_generated_by":{"$regex":"^nmdc:wfmp"}}'
-        self.workflow_filter = '{"type":"nmdc:MetaproteomicsAnalysis"}'
-    
-    def get_functional_terms_from_peptide_report(self, url):
-        """Function to get the functional terms from a URL of a Peptide Report
-
-        Parameters
-        ----------
-        url : str
-            URL to the Peptide Report
-
-        Returns
-        -------
-        dict
-            Dictionary of KEGG, COG, and PFAM terms with their respective spectral counts derived from the Peptide Report
-        """
-        # Parse the Peptide Report content
-        content_pep = self.read_url_tsv(url)
-
-        # Initialize the dictionary to store the peptide annotations for each peptide sequence
-        pep_dict = {}
-
-        # Loop through the Peptide Report content and populate the dictionary for each peptide sequence
-        for line in content_pep:
-            peptide_sequence = line.get("peptide_sequence")
-            
-            # Add the peptide sequence and spectral count to the dictionary and initialize the annotations list
-            if peptide_sequence not in pep_dict:
-                pep_dict[peptide_sequence] = {}
-                pep_dict[peptide_sequence]["spectral_counts"] = int(float(line.get("peptide_spectral_count")))
-                pep_dict[peptide_sequence]["annotations"] = []
-            
-            # Get the annotations for the peptide sequence
-            annotations = []
-
-            # Add ko terms to annotations list
-            ko = line.get("KO")
-            if ko.startswith("KO"):
-                for ko_term in ko.split(","):
-                    # Replace KO: with KEGG.ORTHOLOGY:
-                    ko_clean = ko_term.replace("KO:", "KEGG.ORTHOLOGY:").strip()
-                    annotations.append(ko_clean)
-
-            # Add cog terms to annotations list
-            cog = line.get("COG")
-            if cog.startswith("COG"):
-                for cog_term in cog.split(","):
-                    cog_clean = "COG:" + cog_term.strip()
-                    annotations.append(cog_clean)
-
-            # Add pfam terms to annotations list
-            pfam = line.get("pfam")
-            if pfam.startswith("PF"):
-                for pfam_term in pfam.split(","):
-                    pfam_clean = "PFAM:" + pfam_term.strip()
-                    annotations.append(pfam_clean)
-
-            # Add the annotations to the peptide sequence dictionary
-            pep_dict[peptide_sequence]["annotations"] = list(set(pep_dict[peptide_sequence]["annotations"] + annotations))
-        
-        # Collapse the peptide annotations to the functional annotation level
-        pep_fxns = {}
-        # loop through the peptides and add the annotations and spectral counts to the functional annotations dictionary
-        for pep_seq, pep_single_dict in pep_dict.items():
-            for annotation in pep_single_dict["annotations"]:
-                pep_fxns = self.add_to_dict(pep_fxns, annotation, pep_single_dict["spectral_counts"])
-
-        # Check that all annotations adhere to the expected format for annotations
-        for annotation in pep_fxns.keys():
-            if not re.search(r"(COG:COG\d+|PFAM:PF\d{5}|KEGG.ORTHOLOGY:K\d+)", annotation):
-                raise ValueError(f"Bad annotation formed: {annotation}")
-
-        return pep_fxns
-
-    def find_peptide_report_url(self, dos):
-        """Find the URL for the peptide report from a list of data object IDs
-
-        Parameters
-        ----------
-        dos : list
-            List of data object IDs
-
-        Returns
-        -------
-        str
-            URL for the Peptide Report data object if found
-        """
-        url = None
-
-        # Get all the data object records
-        id_filter = '{"id": {"$in": ["' + '","'.join(dos) + '"]}}'
-        do_recs = self.get_results(
-            collection="data_object_set",
-            filter=id_filter,
-            max_page_size=1000,
-            fields="id,data_object_type,url",
-        )
-
-        # Find the Peptide Report data object and return the URL to access it
-        for do in do_recs:
-            if do.get("data_object_type") == "Peptide Report":
-                url = do.get("url")
-                return url
-
-        # If no Peptide Report data object is found, return None
-        return None
-    
-    def process_activity(self, act):
-        """
-        Function to process a metaproteomics workflow record
-
-        Parameters
-        ----------
-        act : dict
-            Metaproteomics workflow record to process
-
-        Output
-        ------
-        dict
-            Dictionary of functional annotations with their respective spectral counts
-            e.g. {"KEGG.ORTHOLOGY:K00001": 100, "COG:C00001": 50, "PFAM:PF00001": 25}
-        """
-        # Get the URL and ID
-        url = self.find_peptide_report_url(act["has_output"])
-        if not url:
-            raise ValueError(f"Missing url for {act['id']}")
-
-        # Parse the KEGG, COG, and PFAM annotations
-        return self.get_functional_terms_from_peptide_report(url)
-
-
-if __name__ == "__main__":
-    mp = MetaProtAgg()
-    mp.sweep()

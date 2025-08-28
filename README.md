@@ -61,14 +61,11 @@ Now that the container image is hosted there, you can configure a Spin workload 
 
 ### Environment variables
 
-- `MONGO_URL`: Full Mongo URI for connecting to the Mongo database (no default)
 - `LOG_FILE`: Path to file to which logs will be appended (Default: `/tmp/agg.log`)
 - `POLL_TIME`: Number of seconds to sleep between each run (Default: `14400`, which is 4 hours)
-- `NMDC_BASE_URL`: Base URL to access the data (Default: `https://data.microbiomedata.org/data`)
-- `NMDC_BASE_PATH`: Base path to the data on disk (Default: `/global/cfs/cdirs/m3408/results`)
 - `NMDC_CLIENT_ID`: Client ID for interacting with NMDC's runtime API
 - `NMDC_CLIENT_PW`: Password for interacting with NMDC's runtime API
-- `NMDC_API_URL`: Base url for NMCD runtime API (Default: `https://api-dev.microbiomedata.org`, which is the dev url)
+- `ENV`: Whether to run the scripts in the production or development runtime environment. Options are "prod" or "dev".
 
 ## Release Notes
 
