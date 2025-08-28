@@ -8,8 +8,6 @@ import warnings
 import json
 import sys
 from datetime import datetime
-import random
-import string
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)

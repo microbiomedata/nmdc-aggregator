@@ -16,7 +16,17 @@ class AnnotationLine():
         self.ec_numbers = None
         self.pfams = None
 
-        annotations = line.split("\t")[8].split(";")
+        line = line.strip()
+
+        if not line or line.startswith("#"):
+            return
+        fields = line.split("\t")
+
+        if len(fields) < 9:
+            print(f"[WARN] Skipping malformed GFF line (only {len(fields)} fields): {line}")
+            return
+
+        annotations = fields[8].split(";")
         self.id = annotations[0][3:]
         if filter and self.id not in filter:
             return
