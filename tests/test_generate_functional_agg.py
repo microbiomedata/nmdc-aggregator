@@ -1,5 +1,6 @@
 from generate_metag_metat_functional_agg import AnnotationLine
 from generate_metag_metat_functional_agg import MetaGMetaTFuncAgg
+from generate_metap_functional_agg import MetaProtAgg
 
 
 def test_AnnotationLine():
@@ -13,11 +14,19 @@ def test_AnnotationLine():
     assert anno.pfams == ["PFAM:PF00535", "PFAM:PF02836"]
 
 
-def test_functional_annotation_counts(monkeypatch):
+def test_functional_annotation_counts():
     mp = MetaGMetaTFuncAgg()
     url = "https://portal.nersc.gov/cfs/m3408/test_data/metaT/functional_annotation.gff"
     terms = mp.get_functional_annotation_counts_from_gff_report(url)
-    assert len(terms) == 1965
+    assert len(terms) == 2647
     assert terms["KEGG.ORTHOLOGY:K00031"] == 1
     assert terms["COG:COG0004"] == 3
     assert terms["PFAM:PF00206"] == 2
+
+def test_functional_annotation_counts():
+    mp = MetaProtAgg()
+    url = "https://nmdcdemo.emsl.pnnl.gov/proteomics/results/2/nmdc_dobj-11-9gcej008_nmdc_dobj-11-j5mh8584_Peptide_Report.tsv"
+    terms = mp.get_functional_terms_from_peptide_report(url)
+    assert len(terms) == 1943
+    assert terms["KEGG.ORTHOLOGY:K00031"] == 8
+    assert terms["COG:COG0004"] == 1

@@ -8,6 +8,10 @@ import warnings
 import json
 import sys
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR)
