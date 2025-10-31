@@ -96,6 +96,10 @@ class Aggregator(ABC):
         }
 
         rv = requests.post(self.base_url + "/token", data=token_request_body)
+        if rv.status_code != 200:
+            error_msg = f"Getting token failed with status code: {rv.status_code}, Response: {rv.text}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
         token_response = rv.json()
         if "access_token" not in token_response:
             logger.error(
