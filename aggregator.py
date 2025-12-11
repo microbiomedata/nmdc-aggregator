@@ -351,7 +351,6 @@ class Aggregator(ABC):
 
             # Check if records already exist before submitting
             if self.check_for_aggregation_records(mp_wf_rec["id"]):
-                logger.info(f"Aggregation records already exist for workflow: {mp_wf_rec['id']}, skipping submission")
                 continue
 
             response = self.submit_json_records(json_record_full)
@@ -360,8 +359,8 @@ class Aggregator(ABC):
                     f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}"
                 )
             if response == 200:
-                logger.info(
-                    f"Submitted aggregation records for the workflow: {mp_wf_rec['id']}"
+                print(
+                    "Submitted aggregation records for the workflow: ", mp_wf_rec["id"]
                 )
 
     def sweep_success(self):
