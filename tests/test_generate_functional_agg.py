@@ -23,10 +23,15 @@ def test_functional_annotation_counts():
     assert terms["COG:COG0004"] == 3
     assert terms["PFAM:PF00206"] == 2
 
-def test_functional_annotation_counts():
+def test_functional_annotation_counts_metaproteomics():
     mp = MetaProtAgg()
     url = "https://nmdcdemo.emsl.pnnl.gov/proteomics/results/2/nmdc_dobj-11-9gcej008_nmdc_dobj-11-j5mh8584_Peptide_Report.tsv"
     terms = mp.get_functional_terms_from_peptide_report(url)
     assert len(terms) == 1943
     assert terms["KEGG.ORTHOLOGY:K00031"] == 8
     assert terms["COG:COG0004"] == 1
+
+def test_check_for_aggregation_records():
+    mp = MetaProtAgg()
+    assert mp.check_for_aggregation_records("nmdc:wfmp-11-yafgh176.1")
+    assert not mp.check_for_aggregation_records("nonexistent_wf_id")
