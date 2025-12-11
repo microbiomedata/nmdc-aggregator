@@ -106,7 +106,7 @@ class Aggregator(ABC):
             )
         self.nmdc_api_token = token_response["access_token"]
 
-    def get_results(self, collection: str, filter="", max_page_size=100, fields="", return_all=True):
+    def get_results(self, collection: str, filter="", max_page_size=100, fields="", return_all=True, debug=False):
         """General function to get results from the API using the collection endpoint with optional filter and fields
 
         Parameters
@@ -178,6 +178,7 @@ class Aggregator(ABC):
         list
             List of workflow ids that have already been aggregated
         """
+        raise NotImplementedError("This method has known issues and should not be used.")
         agg_col = self.get_results(
             collection="functional_annotation_agg",
             filter=self.aggregation_filter,
@@ -288,6 +289,9 @@ class Aggregator(ABC):
         list
             List of dictionaries where each dictionary represents a row in the TSV file
         """
+        # Increase the CSV field size limit to handle large fields
+        csv.field_size_limit(sys.maxsize)
+        
         response = requests.get(url)
 
         # Read the TSV content
@@ -319,15 +323,14 @@ class Aggregator(ABC):
         -------
         None
         """
-        # Get list of workflow IDs that have already been processed
-        mp_wf_in_agg = self.get_previously_aggregated_workflow_ids()
-
         # Get list of all workflow records
         mp_wf_recs = self.get_workflow_records()
 
         # Iterate through all of the workflow records
         for mp_wf_rec in mp_wf_recs:
-            if mp_wf_rec["id"] in mp_wf_in_agg:
+
+            # If the workflow has already been aggregated, skip it
+            if self.check_for_aggregation_records(mp_wf_rec["id"]):
                 continue
             try:
                 functional_agg_dict = self.process_activity(mp_wf_rec)
@@ -349,19 +352,13 @@ class Aggregator(ABC):
                 )
             json_record_full = {"functional_annotation_agg": json_records}
 
-            # Check if records already exist before submitting
-            if self.check_for_aggregation_records(mp_wf_rec["id"]):
-                continue
-
             response = self.submit_json_records(json_record_full)
             if response != 200:
                 logger.error(
                     f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}"
                 )
             if response == 200:
-                print(
-                    "Submitted aggregation records for the workflow: ", mp_wf_rec["id"]
-                )
+                logger.info(f"Successfully submitted aggregation records for workflow: {mp_wf_rec['id']}")
 
     def sweep_success(self):
         """Function to check the results of the sweep and ensure that the records were added to the database
