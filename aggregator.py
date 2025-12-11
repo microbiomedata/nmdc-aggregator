@@ -106,7 +106,7 @@ class Aggregator(ABC):
             )
         self.nmdc_api_token = token_response["access_token"]
 
-    def get_results(self, collection: str, filter="", max_page_size=100, fields=""):
+    def get_results(self, collection: str, filter="", max_page_size=100, fields="", return_all=True):
         """General function to get results from the API using the collection endpoint with optional filter and fields
 
         Parameters
@@ -124,6 +124,9 @@ class Aggregator(ABC):
             Fields to return in the query, separated by commas without spaces if multiple
             e.g. "id,data_object_type,url"
             Default is an empty string, which returns all fields
+        return_all : bool, optional
+            If True, returns all pages of results. If False, returns only the first page.
+            Default is True
         """
 
         # Get initial results (before next_page_token is given in the results)
@@ -141,6 +144,10 @@ class Aggregator(ABC):
         # append first page of results to an empty list
         for result in results:
             result_list.append(result)
+
+        # If return_all is False, return only the first page
+        if not return_all:
+            return result_list
 
         # if there are multiple pages of results returned
         if initial_data.get("next_page_token"):
@@ -179,6 +186,31 @@ class Aggregator(ABC):
         )
         ids = list(set([x["was_generated_by"] for x in agg_col]))
         return ids
+
+    def check_for_aggregation_records(self, workflow_id: str):
+        """Function to check if aggregation records exist for a specific workflow ID.
+
+        Parameters
+        ----------
+        workflow_id : str
+            The workflow ID to check for existing aggregation records
+
+        Returns
+        -------
+        bool
+            True if records exist for this workflow ID, False otherwise
+        """
+        filter_str = f'{{"was_generated_by":"{workflow_id}"}}'
+        
+        # No need to return all records, just check if any exist
+        agg_col = self.get_results(
+            collection="functional_annotation_agg",
+            filter=filter_str,
+            max_page_size=100,
+            fields="was_generated_by",
+            return_all=False
+        )
+        return len(agg_col) > 0
 
     def get_workflow_records(self):
         """Function to return full workflow execution records in the database
@@ -317,14 +349,19 @@ class Aggregator(ABC):
                 )
             json_record_full = {"functional_annotation_agg": json_records}
 
+            # Check if records already exist before submitting
+            if self.check_for_aggregation_records(mp_wf_rec["id"]):
+                logger.info(f"Aggregation records already exist for workflow: {mp_wf_rec['id']}, skipping submission")
+                continue
+
             response = self.submit_json_records(json_record_full)
             if response != 200:
                 logger.error(
                     f"Error submitting the aggregation records for the workflow: {mp_wf_rec['id']}, Response code: {response}"
                 )
             if response == 200:
-                print(
-                    "Submitted aggregation records for the workflow: ", mp_wf_rec["id"]
+                logger.info(
+                    f"Submitted aggregation records for the workflow: {mp_wf_rec['id']}"
                 )
 
     def sweep_success(self):
