@@ -6,8 +6,8 @@ if [ -z $LOG_FILE ] ; then
 fi
 
 if [ -z $POLL_TIME ] ; then
-        # DEFAULT every 8 hours
-        POLL_TIME=28800
+        # DEFAULT every 4 hours
+	POLL_TIME=14400
 fi
 
 while true ; do

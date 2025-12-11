@@ -106,7 +106,7 @@ class Aggregator(ABC):
             )
         self.nmdc_api_token = token_response["access_token"]
 
-    def get_results(self, collection: str, filter="", max_page_size=100, fields="", return_all=True, debug=False):
+    def get_results(self, collection: str, filter="", max_page_size=100, fields="", return_all=True):
         """General function to get results from the API using the collection endpoint with optional filter and fields
 
         Parameters
